@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 
 dotenv.config();
 
@@ -10,9 +11,11 @@ const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: isProduction ? process.env.CLIENT_URL : 'http://localhost:5173',
   credentials: true,
 }));
 app.use(express.json());
@@ -25,6 +28,15 @@ app.use('/api/users', userRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
+// Serve React build in production
+if (isProduction) {
+  const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
+  app.use(express.static(frontendBuild));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendBuild, 'index.html'));
+  });
+}
 
 // MongoDB connection
 mongoose
