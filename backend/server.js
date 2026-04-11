@@ -15,8 +15,12 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Middleware
 app.use(cors({
-  origin: isProduction ? process.env.CLIENT_URL : 'http://localhost:5173',
+  origin: isProduction 
+    ? ['https://realestatecrm.vercel.app', process.env.CLIENT_URL || 'https://realestatecrm.vercel.app']
+    : 'http://localhost:5173',
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 
