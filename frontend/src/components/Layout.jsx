@@ -55,7 +55,7 @@ export default function Layout({ children }) {
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top bar */}
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3 shrink-0">
+        <header className="h-14 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-3 shrink-0">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -73,7 +73,7 @@ export default function Layout({ children }) {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((o) => !o)}
-              className="flex items-center gap-2 hover:bg-gray-100 rounded-xl px-2 py-1.5 transition"
+              className="flex items-center gap-2 hover:bg-gray-200 rounded-xl px-2 py-1.5 transition"
             >
               <div className="w-7 h-7 bg-primary-600 text-white rounded-full flex items-center justify-center font-bold text-xs">
                 {initials}

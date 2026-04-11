@@ -86,7 +86,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="••••••••"
+                placeholder="ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
                 className="input-field"
               />
             </div>

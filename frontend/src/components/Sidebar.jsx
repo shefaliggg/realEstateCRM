@@ -159,12 +159,12 @@ export default function Sidebar({ mobileOpen, onClose }) {
         <div className="fixed inset-0 bg-black/40 z-20 lg:hidden" onClick={onClose} />
       )}
       <aside className={`
-        fixed top-0 left-0 z-30 h-screen w-60 bg-white border-r border-gray-200 flex flex-col
+        fixed top-0 left-0 z-30 h-screen w-60 bg-gray-100 border-r border-gray-200 flex flex-col
         transition-transform duration-300 ease-in-out
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto
       `}>
         {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-gray-100 shrink-0">
+        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-gray-200 shrink-0">
           <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
@@ -191,7 +191,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                     className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
                       ${isActive(item.path)
                         ? 'bg-primary-50 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+                          : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
@@ -204,7 +204,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                       className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
                         ${open.has(item.label) || item.sub?.some(s => isActive(s.path))
                           ? 'text-primary-700 bg-primary-50/60'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+                          : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                     >
                       <NavIcon name={item.icon} />
                       <span className="flex-1 text-left">{item.label}</span>
@@ -225,7 +225,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                             className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-all
                               ${isActive(child.path)
                                 ? 'text-primary-700 font-semibold bg-primary-50'
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
                           >
                             <span className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`} />
                             {child.label}
