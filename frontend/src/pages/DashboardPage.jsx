@@ -4,10 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 
 const statCards = [
-  { label: 'Total Users', icon: '👥', color: 'bg-blue-50 text-blue-600', key: 'users' },
-  { label: 'Active Agents', icon: '🏠', color: 'bg-green-50 text-green-600', key: 'agents' },
-  { label: 'Clients', icon: '🤝', color: 'bg-purple-50 text-purple-600', key: 'clients' },
-  { label: 'Admins', icon: '🛡️', color: 'bg-orange-50 text-orange-600', key: 'admins' },
+  { label: 'Total Users', icon: '👥', color: 'bg-primary-50 text-primary-600', key: 'users' },
+  { label: 'Active Agents', icon: '🏠', color: 'bg-amber-50 text-amber-600', key: 'agents' },
+  { label: 'Clients', icon: '🤝', color: 'bg-orange-50 text-orange-500', key: 'clients' },
+  { label: 'Admins', icon: '🛡️', color: 'bg-red-50 text-red-500', key: 'admins' },
 ]
 
 export default function DashboardPage() {
@@ -97,7 +97,7 @@ export default function DashboardPage() {
                           <td className="px-6 py-3 font-medium text-gray-800">{u.name}</td>
                           <td className="px-6 py-3 text-gray-500">{u.email}</td>
                           <td className="px-6 py-3">
-                            <span className="capitalize px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600">
+                            <span className="capitalize px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-600">
                               {u.role}
                             </span>
                           </td>
@@ -136,7 +136,7 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-800">Your Dashboard</h3>
             <p className="text-gray-500 text-sm mt-2">
               You are logged in as a{' '}
-              <span className="text-blue-600 font-medium capitalize">{user?.role}</span>.
+              <span className="text-primary-600 font-medium capitalize">{user?.role}</span>.
               More features coming soon!
             </p>
           </div>
