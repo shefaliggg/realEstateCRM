@@ -2,34 +2,29 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/server.js",
+      "src": "backend/package.json",
       "use": "@vercel/node",
       "config": {
-        "maxLambdaSize": "50mb"
+        "includeFiles": "**/*.js",
+        "excludeFiles": "node_modules/**"
       }
     },
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "frontend/dist"
+        "distDir": "dist"
       }
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/api/.*",
       "dest": "backend/server.js"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend/dist/$1",
-      "status": 200
+      "dest": "frontend/$1"
     }
-  ],
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "JWT_SECRET": "@jwt_secret",
-    "NODE_ENV": "production"
-  }
+  ]
 }
