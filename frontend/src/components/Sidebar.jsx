@@ -19,8 +19,9 @@ const NAV = [
         { label: 'Lead Sources', path: '/leads/sources' },
       ]},
       { label: 'Deals', icon: 'deal', sub: [
+        { label: 'All Deals', path: '/deals' },
         { label: 'Pipeline', path: '/deals/pipeline' },
-        { label: 'Closed Deals', path: '/deals/closed' },
+        { label: 'My Deals', path: '/deals/mine' },
       ]},
       { label: 'Site Visits', icon: 'calendar', sub: [
         { label: 'Schedule Visit', path: '/visits/schedule' },
