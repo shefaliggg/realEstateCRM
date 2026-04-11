@@ -13,15 +13,22 @@ const app = express();
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Middleware
-app.use(cors({
-  origin: isProduction 
-    ? ['https://realestatecrm.vercel.app', process.env.CLIENT_URL || 'https://realestatecrm.vercel.app']
-    : 'http://localhost:5173',
+// CORS Configuration
+const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+};
+
+if (isProduction) {
+  // Allow any origin on Vercel (same domain serves both)
+  corsOptions.origin = true;
+} else {
+  corsOptions.origin = 'http://localhost:5173';
+}
+
+// Middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
@@ -33,14 +40,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
-// Serve React build in production
-if (isProduction) {
-  const frontendBuild = path.join(__dirname, '..', 'frontend', 'dist');
-  app.use(express.static(frontendBuild));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(frontendBuild, 'index.html'));
-  });
-}
+// Note: Frontend is served separately on Vercel
+// This backend only handles API routes
 
 // MongoDB connection
 mongoose

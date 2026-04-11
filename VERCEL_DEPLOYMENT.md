@@ -1,170 +1,192 @@
-# Vercel Deployment Guide
+# Vercel Deployment Guide - FIXED
 
-## Prerequisites
-- Vercel account (sign up at https://vercel.com)
-- GitHub repository with your code
-- MongoDB Atlas account with connection string
+## Issue & Solution
 
-## Step 1: Push to GitHub
-```bash
-git add .
-git commit -m "Add Vercel deployment configuration"
-git push origin main
-```
+**Problem**: 405 Method Not Allowed on `/api/auth/login`
 
-## Step 2: Connect to Vercel
+**Root Cause**: The experimental services configuration wasn't routing requests correctly.
 
-### Option A: Using Vercel CLI (Recommended)
-```bash
-npm i -g vercel
-vercel
-```
-Follow the prompts to connect your GitHub account and deploy.
+**Solution**: Updated to use standard Vercel configuration with proper routing:
+- `/api/*` → Backend (Node.js serverless functions)
+- `/*` → Frontend (Vite static build)
 
-### Option B: Using Vercel Dashboard
-1. Go to https://vercel.com/dashboard
-2. Click "Add New Project"
-3. Select your GitHub repository
-4. Vercel will auto-detect it's a monorepo
-5. Configure as shown below
+## New Configuration
 
-## Step 3: Configure Environment Variables in Vercel
+The root `vercel.json` now uses:
+- Separate builds for backend (Node.js) and frontend (Static)
+- Route-based request handling
+- Proper CORS configuration for same-domain requests
 
-In your Vercel project settings, add these environment variables:
+## Environment Variables Setup
 
-### For Backend (Set for all environments)
+### Backend Variables (Required)
 ```
 MONGO_URI=mongodb+srv://shefali:PASSWORD@tno2pot.mongodb.net/realEstateCRM?directConnection=true&maxPoolSize=1
 JWT_SECRET=your_secure_jwt_secret_key_here
 NODE_ENV=production
 ```
 
-### For Frontend (Set for all environments)
-```
-VITE_API_URL=https://realestatecrm.vercel.app/api
-```
-
-## Step 4: Root Directory Configuration
-
-In Vercel project settings:
-- **Root Directory**: Leave empty (monorepo)
-- **Build Command**: Leave default (handled by vercel.json)
-- **Output Directory**: Leave default (handled by vercel.json)
-
-## Project Structure
-```
-realEstateCRM/
-├── vercel.json                    # Root config with experimental services
-├── frontend/
-│   ├── vercel.json               # Vite config
-│   ├── package.json
-│   ├── vite.config.js
-│   └── src/
-├── backend/
-│   ├── vercel.json               # Node.js serverless config
-│   ├── package.json
-│   └── server.js
-└── .vercelignore
-```
+### Frontend Variables (Optional)
+- Leave empty or set `VITE_API_URL=/api` (will auto-detect)
 
 ## Deployment URLs
 
-After deployment, you'll have:
-- **Frontend**: `https://realestatecrm.vercel.app`
-- **Backend API**: `https://realestatecrm.vercel.app/_/backend/api`
+After deployment:
+- **Frontend**: `https://real-estate-crm-gilt-five.vercel.app`
+- **Backend API**: `https://real-estate-crm-gilt-five.vercel.app/api`
 
-## Frontend Routes
+## API Endpoint Examples
 
-All frontend routes will be served from `https://realestatecrm.vercel.app`:
-- `/login`
-- `/dashboard`
-- `/properties`
-- `/leads`
-- `/deals`
-- etc.
+```
+POST   https://real-estate-crm-gilt-five.vercel.app/api/auth/login
+GET    https://real-estate-crm-gilt-five.vercel.app/api/users
+GET    https://real-estate-crm-gilt-five.vercel.app/api/health
+```
 
-## Backend API Routes
+## How to Fix Current Deployment
 
-All API calls will go to `https://realestatecrm.vercel.app/_/backend/api`:
-- `/api/auth/login`
-- `/api/users`
-- `/api/properties` (once created)
-- etc.
+### Step 1: Push Updated Configuration
+```bash
+git add .
+git commit -m "Fix Vercel deployment routing configuration"
+git push origin main
+```
+
+### Step 2: Redeploy on Vercel
+
+Option A: Auto-redeploy (Vercel will detect changes)
+- Wait for automatic rebuild after git push
+
+Option B: Manual redeploy
+```bash
+vercel --prod
+```
+
+Option C: Force redeploy from dashboard
+1. Go to Vercel Dashboard
+2. Select your project
+3. Go to Deployments tab
+4. Find latest deployment → Click "..." → "Redeploy"
+
+### Step 3: Verify Deployment
+
+Test the API:
+```bash
+curl -X POST https://real-estate-crm-gilt-five.vercel.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"shefaliggg@gmail.com","password":"admin@123#"}'
+```
+
+Expected response: Should return 200 with JWT token or 401 if credentials invalid
+
+## Frontend Routes will be Served
+
+All routes work automatically:
+- `/` → App homepage
+- `/login` → Login page
+- `/dashboard` → Dashboard
+- `/properties` → Properties list
+- `/leads` → Leads list
+- `/deals` → Deals list
+- ...and all other routes
+
+## How Vercel Handles This
+
+1. **Initial Request** → Vercel checks URL pattern
+2. **If `/api/*`** → Routes to backend serverless function
+3. **Otherwise** → Serves from frontend dist folder
+4. **404 on frontend** → Vercel rewrites to `index.html` (React Router handles it)
+
+## File Structure on Vercel
+
+```
+vercel.json                    # Root routing config
+├── backend/
+│   ├── vercel.json          # Node.js build config
+│   ├── server.js            # Express app
+│   └── package.json
+└── frontend/
+    ├── vercel.json          # Build output config
+    ├── dist/                # Built React app (generated)
+    ├── package.json
+    └── src/
+```
 
 ## Troubleshooting
 
-### 1. API Calls Failing (404 or CORS errors)
-- Check Environment Variables in Vercel dashboard
-- Verify `VITE_API_URL` is set to `https://realestatecrm.vercel.app/api`
-- Check backend CORS settings in `server.js`
+### 1. Still Getting 405 Error
+- Check environment variables are set in Vercel dashboard
+- Verify `NODE_ENV=production` is set
+- Check function logs in Vercel dashboard
 
-### 2. Build Failing
-```bash
-# Test locally first
-cd frontend && npm run build
-cd ../backend && npm install
+To view logs:
+```
+Vercel Dashboard → Deployments → Click latest → Logs tab
 ```
 
-### 3. MongoDB Connection Issues
-- Verify MongoDB connection string in environment variables
-- Check IP whitelist in MongoDB Atlas (allow all IPs or Vercel IP)
-- Test connection: `mongodb+srv://shefali:PASSWORD@tno2pot.mongodb.net`
+### 2. Frontend Not Loading
+- Check that frontend build is successful
+- Verify `VITE_API_URL` is not set (or set to `/api`)
+- Clear browser cache and hard refresh (Ctrl+Shift+R or Cmd+Shift+R)
 
-### 4. Clearing Cache
-If you have build issues:
-1. Go to Deployer Settings → Git
-2. Disconnect and reconnect repository
-3. Redeploy
+### 3. CORS Errors
+- Check browser console for exact error
+- Verify backend is responding at `/api/health`
+- CORS should be auto-handled since it's same domain
 
-## Monitoring & Logs
+### 4. API Calls Timing Out
+- Check MongoDB connection string
+- Verify database is accessible from Vercel IP
+- Check function timeout (default 10s, some operations might need longer)
 
-In Vercel Dashboard:
-1. Go to your project → Deployments
-2. Click on a deployment → Logs tab
-3. View real-time logs during build and runtime
+## Local Development
 
-## Production Checklist
+To test locally before deploying:
 
-- [ ] MongoDB connection string verified
-- [ ] JWT_SECRET set to a strong random value
-- [ ] VITE_API_URL correctly configured
-- [ ] CORS origin updated for production domain
-- [ ] Environment variables set in Vercel dashboard
-- [ ] Login test successful
-- [ ] API endpoints responding correctly
-- [ ] Error logs checked for issues
+```bash
+# Terminal 1: Backend
+cd backend
+npm install
+npm run dev
+# Server runs on http://localhost:5000
+
+# Terminal 2: Frontend
+cd frontend
+npm install
+npm run dev
+# App runs on http://localhost:5173
+```
+
+Axios will automatically use `http://localhost:5000/api` in development.
 
 ## Next Steps
 
-1. **Add Property APIs**: Create backend endpoints for CRUD operations
-2. **Add Lead APIs**: Implement lead management endpoints
-3. **Add Deal APIs**: Implement sales pipeline endpoints
-4. **Database Models**: Create MongoDB schemas for all entities
-5. **Testing**: Thoroughly test all features in production
+1. ✅ Update and commit configuration
+2. ✅ Redeploy on Vercel
+3. ⬜ Test login endpoint
+4. ⬜ Test all frontend routes
+5. ⬜ Test API calls from frontend
+6. ⬜ Add database models and endpoints for properties, leads, deals
 
-## Useful Commands
+## Verification Checklist
 
-```bash
-# Local development
-npm run dev          # Both frontend and backend
+- [ ] Git push successful
+- [ ] Vercel deployment triggered
+- [ ] Build completed without errors
+- [ ] Frontend loads at main URL
+- [ ] Login page accessible
+- [ ] API health check responds (200 status)
+- [ ] Login endpoint responds (not 405)
+- [ ] Can log in with credentials
+- [ ] Dashboard loads after login
+- [ ] All navigation links work
 
-# Build for production
-npm run build
+## Performance Notes
 
-# Test production build locally
-npm run preview
+- Backend: Serverless functions (Node.js)
+- Frontend: Static build (optimized by Vercel)
+- Database: MongoDB Atlas (remote)
+- CDN: Vercel edge network (automatic)
 
-# Deploy from CLI
-vercel
+This setup is production-ready and scales automatically.
 
-# Check deployment status
-vercel status
-```
-
-## Support
-
-For issues:
-1. Check Vercel documentation: https://vercel.com/docs
-2. Check backend logs in Vercel dashboard
-3. Browser console for frontend errors
-4. MongoDB Atlas logs for database issues
