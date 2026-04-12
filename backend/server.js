@@ -25,8 +25,7 @@ const corsOptions = {
 };
 
 if (isProduction) {
-  // Allow any origin on Vercel (same domain serves both)
-  corsOptions.origin = true;
+  corsOptions.origin = process.env.FRONTEND_URL || true;
 } else {
   corsOptions.origin = 'http://localhost:5173';
 }
@@ -48,9 +47,6 @@ app.use('/api/deals', dealRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
-
-// Note: Frontend is served separately on Vercel
-// This backend only handles API routes
 
 // MongoDB connection
 mongoose
