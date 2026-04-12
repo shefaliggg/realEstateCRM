@@ -1,261 +1,192 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-
-const PROPERTIES = [
-  { id: 1, name: 'Skyline Residency - 2BHK' },
-  { id: 2, name: 'Green Valley Villa - 3BHK' },
-  { id: 3, name: 'Corporate Park' },
-  { id: 4, name: 'Urban Homes - Penthouse' },
-  { id: 5, name: 'Metro Heights - Plot' },
-]
-
-const LEADS = [
-  { id: 1, name: 'Ankit Joshi' },
-  { id: 2, name: 'Seema Patel' },
-  { id: 3, name: 'Rohit Das' },
-  { id: 4, name: 'Neha Reddy' },
-  { id: 5, name: 'Vikram Kapoor' },
-]
+import api from '../api/axios'
 
 const STAGES = ['Lead Qualification', 'Needs Analysis', 'Proposal Sent', 'Negotiation', 'Contract Review', 'Won', 'Lost']
+const cls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
 export default function AddDealPage() {
   const navigate = useNavigate()
+  const [projects, setProjects] = useState([])
+  const [leads, setLeads] = useState([])
+  const [units, setUnits] = useState([])
+  const [filteredUnits, setFilteredUnits] = useState([])
   const [form, setForm] = useState({
     dealName: '',
-    property: '',
-    lead: '',
+    projectId: '',
+    unitId: '',
+    leadId: '',
     stage: 'Lead Qualification',
-    dealValue: '',
+    value: '',
     commission: '',
     closingDate: '',
     description: '',
-    notes: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState({})
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function set(key, val) {
-    setForm((f) => ({ ...f, [key]: val }))
-    setErrors((e) => ({ ...e, [key]: undefined }))
+  useEffect(() => {
+    Promise.all([api.get('/projects'), api.get('/leads')])
+      .then(([pRes, lRes]) => {
+        setProjects(pRes.data)
+        setLeads(lRes.data)
+      })
+      .catch(() => setError('Failed to load form data'))
+  }, [])
+
+  const handleProjectChange = async projectId => {
+    setForm(f => ({ ...f, projectId, unitId: '' }))
+    if (!projectId) { setUnits([]); setFilteredUnits([]); return }
+    try {
+      const res = await api.get(`/projects/${projectId}/units`)
+      const available = res.data.filter(u => u.status === 'Available')
+      setUnits(available)
+      setFilteredUnits(available)
+    } catch {
+      setUnits([])
+      setFilteredUnits([])
+    }
   }
 
-  function validate() {
-    const e = {}
-    if (!form.dealName.trim()) e.dealName = 'Required'
-    if (!form.property) e.property = 'Required'
-    if (!form.lead) e.lead = 'Required'
-    if (!form.dealValue) e.dealValue = 'Required'
-    if (!form.closingDate) e.closingDate = 'Required'
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  async function handleSubmit(e) {
+  const handleSubmit = async e => {
     e.preventDefault()
-    if (!validate()) return
-    setSaving(true)
-    await new Promise((r) => setTimeout(r, 800))
-    setSaving(false)
-    navigate('/deals')
+    setError('')
+    if (!form.dealName || !form.unitId || !form.leadId) {
+      setError('Deal name, unit, and lead are required')
+      return
+    }
+    setLoading(true)
+    try {
+      const payload = {
+        dealName: form.dealName,
+        unit: form.unitId,
+        lead: form.leadId,
+        stage: form.stage,
+        value: form.value ? Number(form.value) : undefined,
+        commission: form.commission ? Number(form.commission) : undefined,
+        closingDate: form.closingDate || undefined,
+        description: form.description,
+      }
+      const res = await api.post('/deals', payload)
+      navigate(`/deals/${res.data._id}`)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create deal')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const inputCls = 'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition placeholder:text-gray-300'
-  const selectCls = 'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition text-gray-700'
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          to="/deals"
-          className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <nav className="text-xs text-gray-400 mb-0.5">
-            <Link to="/deals" className="hover:text-primary-600">
-              Deals
+          <div className="p-6 max-w-2xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <Link to="/deals" className="hover:text-primary-600">Deals</Link>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">Add Deal</span>
+        </div>
+
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">🤝 Add New Deal</h1>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Deal Info */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">📋 Deal Info</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Deal Name *</label>
+                <input value={form.dealName} onChange={e => set('dealName', e.target.value)} required
+                  className={cls} placeholder="Deal for Block A-301" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
+                <select value={form.stage} onChange={e => set('stage', e.target.value)} className={cls}>
+                  {STAGES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Lead *</label>
+                <select value={form.leadId} onChange={e => set('leadId', e.target.value)} className={cls} required>
+                  <option value="">Select lead...</option>
+                  {leads.map(l => <option key={l._id} value={l._id}>{l.name} — {l.phone}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Unit Picker */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">🏠 Unit Selection *</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                <select value={form.projectId} onChange={e => handleProjectChange(e.target.value)} className={cls}>
+                  <option value="">Select project...</option>
+                  {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </select>
+              </div>
+              {form.projectId && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Available Unit {filteredUnits.length === 0 ? '(no available units)' : `(${filteredUnits.length} available)`}
+                  </label>
+                  <select value={form.unitId} onChange={e => set('unitId', e.target.value)} className={cls} required>
+                    <option value="">Select unit...</option>
+                    {filteredUnits.map(u => (
+                      <option key={u._id} value={u._id}>
+                        Block {u.block} – {u.unitNo} (Floor {u.floor}) · {u.bhkType}{u.carpetArea ? ` · ${u.carpetArea} sqft` : ''}{u.basePrice ? ` · ₹${(u.basePrice / 100000).toFixed(1)}L` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Financials */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">💰 Financials</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Deal Value (₹)</label>
+                <input type="number" min="0" value={form.value} onChange={e => set('value', e.target.value)}
+                  className={cls} placeholder="7500000" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission (₹)</label>
+                <input type="number" min="0" value={form.commission} onChange={e => set('commission', e.target.value)}
+                  className={cls} placeholder="150000" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Close</label>
+                <input type="date" value={form.closingDate} onChange={e => set('closingDate', e.target.value)}
+                  className={cls} />
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">📝 Description</h2>
+            <textarea value={form.description} onChange={e => set('description', e.target.value)}
+              rows={3} className={cls} placeholder="Additional notes about this deal..." />
+          </div>
+
+          <div className="flex gap-3">
+            <button type="submit" disabled={loading}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+              {loading ? 'Creating...' : 'Create Deal'}
+            </button>
+            <Link to="/deals" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+              Cancel
             </Link>
-            <span className="mx-1">/</span>
-            <span className="text-gray-700">Add Deal</span>
-          </nav>
-          <h2 className="text-xl font-bold text-gray-900">Add New Deal</h2>
-        </div>
+          </div>
+        </form>
       </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Deal Info */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">📋</span>
-            Deal Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Deal Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={form.dealName}
-                onChange={(e) => set('dealName', e.target.value)}
-                placeholder="e.g., Skyline Residency - 2BHK Sale"
-                className={`${inputCls} ${errors.dealName ? 'border-red-400 focus:ring-red-400' : ''}`}
-              />
-              {errors.dealName && <p className="text-xs text-red-500 mt-1">{errors.dealName}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Stage <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.stage}
-                onChange={(e) => set('stage', e.target.value)}
-                className={selectCls}
-              >
-                {STAGES.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Property <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.property}
-                onChange={(e) => set('property', e.target.value)}
-                className={`${selectCls} ${errors.property ? 'border-red-400' : ''}`}
-              >
-                <option value="">Select property</option>
-                {PROPERTIES.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              {errors.property && <p className="text-xs text-red-500 mt-1">{errors.property}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Lead <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={form.lead}
-                onChange={(e) => set('lead', e.target.value)}
-                className={`${selectCls} ${errors.lead ? 'border-red-400' : ''}`}
-              >
-                <option value="">Select lead</option>
-                {LEADS.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-              {errors.lead && <p className="text-xs text-red-500 mt-1">{errors.lead}</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Info */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">💰</span>
-            Financial Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Deal Value (INR) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={form.dealValue}
-                onChange={(e) => set('dealValue', e.target.value)}
-                placeholder="0"
-                className={`${inputCls} ${errors.dealValue ? 'border-red-400' : ''}`}
-              />
-              {errors.dealValue && <p className="text-xs text-red-500 mt-1">{errors.dealValue}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Commission (INR)</label>
-              <input
-                type="number"
-                value={form.commission}
-                onChange={(e) => set('commission', e.target.value)}
-                placeholder="Auto-calculated"
-                disabled
-                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
-              />
-              <p className="text-xs text-gray-400 mt-1">Auto-calculated</p>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Est. Closing Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={form.closingDate}
-                onChange={(e) => set('closingDate', e.target.value)}
-                className={`${inputCls} ${errors.closingDate ? 'border-red-400' : ''}`}
-              />
-              {errors.closingDate && <p className="text-xs text-red-500 mt-1">{errors.closingDate}</p>}
-            </div>
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">📝</span>
-            Notes
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Description</label>
-              <textarea
-                value={form.description}
-                onChange={(e) => set('description', e.target.value)}
-                placeholder="Deal summary and key points…"
-                rows={3}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Internal Notes</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => set('notes', e.target.value)}
-                placeholder="Any special conditions or notes…"
-                rows={3}
-                className={inputCls}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Action bar */}
-        <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-gray-50 py-4 border-t border-gray-200 -mx-6 px-6">
-          <Link to="/deals" className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60"
-          >
-            {saving && (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            {saving ? 'Saving…' : 'Add Deal'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
+      )
 }

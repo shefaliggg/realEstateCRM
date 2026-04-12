@@ -1,27 +1,29 @@
-﻿import { useState, useRef, useEffect } from 'react'
+﻿import { createContext, useContext, useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
 
+const LayoutDepthContext = createContext(false)
+
 const TITLES = {
   '/dashboard': 'Dashboard',
-  '/properties': 'Properties',
+  '/projects': 'Projects',
+  '/inventory': 'Inventory',
+  '/units': 'Unit Detail',
   '/leads': 'Leads',
   '/deals': 'Deals',
-  '/visits': 'Site Visits',
-  '/partners': 'Channel Partners',
-  '/post-sales': 'Post-Sales',
-  '/marketing': 'Marketing',
   '/users': 'Users & Roles',
-  '/reports': 'Reports',
 }
 
 function getTitle(pathname) {
   const match = Object.keys(TITLES).find((k) => pathname === k || pathname.startsWith(k + '/'))
-  return match ? TITLES[match] : 'RealEstate CRM'
+  return match ? TITLES[match] : 'PropVault'
 }
 
 export default function Layout({ children }) {
+  const isNestedLayout = useContext(LayoutDepthContext)
+  if (isNestedLayout) return children
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -50,12 +52,13 @@ export default function Layout({ children }) {
     : 'A'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
-      <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <LayoutDepthContext.Provider value>
+      <div className="flex h-screen overflow-hidden bg-gray-50">
+        <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
-        <header className="h-14 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-3 shrink-0">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Top bar */}
+          <header className="h-14 bg-gray-100 border-b border-gray-200 flex items-center px-4 gap-3 shrink-0">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -131,11 +134,12 @@ export default function Layout({ children }) {
               </div>
             )}
           </div>
-        </header>
+          </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto">{children}</main>
+          {/* Page content */}
+          <main className="flex-1 overflow-y-auto">{children}</main>
+        </div>
       </div>
-    </div>
+    </LayoutDepthContext.Provider>
   )
 }

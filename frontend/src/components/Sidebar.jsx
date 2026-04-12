@@ -9,94 +9,125 @@ const NAV = [
   {
     group: 'CORE',
     items: [
-      { label: 'Properties', icon: 'building', sub: [
-        { label: 'All Properties', path: '/properties' },
-        { label: 'Add Property', path: '/properties/add' },
-      ]},
-      { label: 'Leads', icon: 'users', sub: [
-        { label: 'All Leads', path: '/leads' },
-        { label: 'My Leads', path: '/leads/mine' },
-        { label: 'Lead Sources', path: '/leads/sources' },
-      ]},
-      { label: 'Deals', icon: 'deal', sub: [
-        { label: 'All Deals', path: '/deals' },
-        { label: 'Pipeline', path: '/deals/pipeline' },
-        { label: 'My Deals', path: '/deals/mine' },
-      ]},
-      { label: 'Site Visits', icon: 'calendar', sub: [
-        { label: 'Schedule Visit', path: '/visits/schedule' },
-        { label: 'Calendar', path: '/visits/calendar' },
-      ]},
-      { label: 'Channel Partners', icon: 'handshake', sub: [
-        { label: 'All Partners', path: '/partners' },
-        { label: 'Partner Leads', path: '/partners/leads' },
-        { label: 'Payouts', path: '/partners/payouts' },
-      ]},
-      { label: 'Post-Sales', icon: 'receipt', sub: [
-        { label: 'Customers', path: '/post-sales/customers' },
-        { label: 'Bookings', path: '/post-sales/bookings' },
-        { label: 'Payment Schedules', path: '/post-sales/payment-schedules' },
-        { label: 'Payments', path: '/post-sales/payments' },
-        { label: 'Documents', path: '/post-sales/documents' },
-        { label: 'Referrals', path: '/post-sales/referrals' },
-      ]},
+      {
+        label: 'Projects', icon: 'building', sub: [
+          { label: 'All Projects', path: '/projects' },
+          { label: 'Add Project', path: '/projects/add' },
+          { label: 'Inventory', path: '/inventory' },
+        ],
+      },
+      {
+        label: 'Leads', icon: 'users', sub: [
+          { label: 'All Leads', path: '/leads' },
+          { label: 'Nurture Board', path: '/leads/nurture' },
+          { label: 'My Leads', path: '/leads/mine' },
+          { label: 'Lead Sources', path: '/leads/sources' },
+        ],
+      },
+      {
+        label: 'Deals', icon: 'deal', sub: [
+          { label: 'All Deals', path: '/deals' },
+          { label: 'Pipeline', path: '/deals/pipeline' },
+          { label: 'My Deals', path: '/deals/mine' },
+        ],
+      },
+      {
+        label: 'Site Visits', icon: 'calendar', sub: [
+          { label: 'Schedule Visit', path: '/visits/schedule' },
+          { label: 'Calendar', path: '/visits/calendar' },
+        ],
+      },
+      {
+        label: 'Channel Partners', icon: 'handshake', sub: [
+          { label: 'All Partners', path: '/partners' },
+          { label: 'Partner Leads', path: '/partners/leads' },
+          { label: 'Payouts', path: '/partners/payouts' },
+        ],
+      },
+      {
+        label: 'Post-Sales', icon: 'receipt', sub: [
+          { label: 'Customers', path: '/post-sales/customers' },
+          { label: 'Bookings', path: '/post-sales/bookings' },
+          { label: 'Payment Schedules', path: '/post-sales/payment-schedules' },
+          { label: 'Payments', path: '/post-sales/payments' },
+          { label: 'Documents', path: '/post-sales/documents' },
+          { label: 'Referrals', path: '/post-sales/referrals' },
+        ],
+      },
+      {
+        label: 'Users & Roles', icon: 'user', sub: [
+          { label: 'All Users', path: '/users' },
+          { label: 'Create User', path: '/users/create' },
+          { label: 'Roles & Permissions', path: '/users/roles' },
+        ],
+      },
+      {
+        label: 'Reports', icon: 'report', sub: [
+          { label: 'Sales Reports', path: '/reports/sales' },
+          { label: 'Marketing Reports', path: '/reports/marketing' },
+          { label: 'Performance Reports', path: '/reports/performance' },
+        ],
+      },
     ],
   },
   {
     group: 'MARKETING',
     items: [
-      { label: 'Campaigns', icon: 'chart', sub: [
-        { label: 'All Campaigns', path: '/marketing/campaigns' },
-        { label: 'Create Campaign', path: '/marketing/campaigns/create' },
-      ]},
-      { label: 'Email Marketing', icon: 'email', sub: [
-        { label: 'Campaigns', path: '/marketing/email' },
-        { label: 'Templates', path: '/marketing/email/templates' },
-      ]},
-      { label: 'WhatsApp Marketing', icon: 'whatsapp', sub: [
-        { label: 'Broadcasts', path: '/marketing/whatsapp' },
-        { label: 'Templates', path: '/marketing/whatsapp/templates' },
-      ]},
-      { label: 'SMS Marketing', icon: 'sms', sub: [
-        { label: 'Campaigns', path: '/marketing/sms' },
-      ]},
-      { label: 'Social Media', icon: 'globe', sub: [
-        { label: 'All Posts', path: '/marketing/social' },
-        { label: 'Create Post', path: '/marketing/social/create' },
-        { label: 'Scheduler', path: '/marketing/social/scheduler' },
-      ]},
-      { label: 'Content & SEO', icon: 'pencil', sub: [
-        { label: 'Blogs', path: '/marketing/content' },
-        { label: 'Drafts', path: '/marketing/content/drafts' },
-      ]},
-      { label: 'Paid Ads', icon: 'target', sub: [
-        { label: 'Campaigns', path: '/marketing/ads' },
-        { label: 'Performance', path: '/marketing/ads/performance' },
-      ]},
-      { label: 'AI Calling', icon: 'phone', sub: [
-        { label: 'Call Campaigns', path: '/marketing/calling' },
-        { label: 'Call Logs', path: '/marketing/calling/logs' },
-      ]},
-      { label: 'Marketing Analytics', icon: 'analytics', sub: [
-        { label: 'Overview', path: '/marketing/analytics' },
-        { label: 'Channel Performance', path: '/marketing/analytics/channels' },
-        { label: 'CPL / ROI', path: '/marketing/analytics/roi' },
-      ]},
-    ],
-  },
-  {
-    group: 'SYSTEM',
-    items: [
-      { label: 'Users & Roles', icon: 'user', sub: [
-        { label: 'All Users', path: '/users' },
-        { label: 'Create User', path: '/users/create' },
-        { label: 'Roles & Permissions', path: '/users/roles' },
-      ]},
-      { label: 'Reports', icon: 'report', sub: [
-        { label: 'Sales Reports', path: '/reports/sales' },
-        { label: 'Marketing Reports', path: '/reports/marketing' },
-        { label: 'Performance Reports', path: '/reports/performance' },
-      ]},
+      {
+        label: 'Campaigns', icon: 'chart', sub: [
+          { label: 'All Campaigns', path: '/marketing/campaigns' },
+          { label: 'Create Campaign', path: '/marketing/campaigns/create' },
+        ],
+      },
+      {
+        label: 'Email Marketing', icon: 'email', sub: [
+          { label: 'Campaigns', path: '/marketing/email' },
+          { label: 'Templates', path: '/marketing/email/templates' },
+        ],
+      },
+      {
+        label: 'WhatsApp Marketing', icon: 'whatsapp', sub: [
+          { label: 'Broadcasts', path: '/marketing/whatsapp' },
+          { label: 'Templates', path: '/marketing/whatsapp/templates' },
+        ],
+      },
+      {
+        label: 'SMS Marketing', icon: 'sms', sub: [
+          { label: 'Campaigns', path: '/marketing/sms' },
+        ],
+      },
+      {
+        label: 'Social Media', icon: 'globe', sub: [
+          { label: 'All Posts', path: '/marketing/social' },
+          { label: 'Create Post', path: '/marketing/social/create' },
+          { label: 'Scheduler', path: '/marketing/social/scheduler' },
+        ],
+      },
+      {
+        label: 'Content & SEO', icon: 'pencil', sub: [
+          { label: 'Blogs', path: '/marketing/content' },
+          { label: 'Drafts', path: '/marketing/content/drafts' },
+        ],
+      },
+      {
+        label: 'Paid Ads', icon: 'target', sub: [
+          { label: 'Campaigns', path: '/marketing/ads' },
+          { label: 'Performance', path: '/marketing/ads/performance' },
+        ],
+      },
+      {
+        label: 'AI Calling', icon: 'phone', sub: [
+          { label: 'Call Campaigns', path: '/marketing/calling' },
+          { label: 'Call Logs', path: '/marketing/calling/logs' },
+        ],
+      },
+      {
+        label: 'Marketing Analytics', icon: 'analytics', sub: [
+          { label: 'Overview', path: '/marketing/analytics' },
+          { label: 'Channel Performance', path: '/marketing/analytics/channels' },
+          { label: 'CPL / ROI', path: '/marketing/analytics/roi' },
+        ],
+      },
     ],
   },
 ]
@@ -146,11 +177,12 @@ export default function Sidebar({ mobileOpen, onClose }) {
   const location = useLocation()
   const [open, setOpen] = useState(() => getInitialOpen(location.pathname))
 
-  const toggle = (label) => setOpen((prev) => {
-    const next = new Set(prev)
-    next.has(label) ? next.delete(label) : next.add(label)
-    return next
-  })
+  const toggle = (label) =>
+    setOpen((prev) => {
+      const next = new Set(prev)
+      next.has(label) ? next.delete(label) : next.add(label)
+      return next
+    })
 
   const isActive = (path) => location.pathname === path
 
@@ -159,11 +191,13 @@ export default function Sidebar({ mobileOpen, onClose }) {
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-20 lg:hidden" onClick={onClose} />
       )}
-      <aside className={`
-        fixed top-0 left-0 z-30 h-screen w-60 bg-gray-100 border-r border-gray-200 flex flex-col
-        transition-transform duration-300 ease-in-out
-        ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto
-      `}>
+      <aside
+        className={`
+          fixed top-0 left-0 z-30 h-screen w-60 bg-gray-100 border-r border-gray-200 flex flex-col
+          transition-transform duration-300 ease-in-out
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto
+        `}
+      >
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 h-14 border-b border-gray-200 shrink-0">
           <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
@@ -171,13 +205,16 @@ export default function Sidebar({ mobileOpen, onClose }) {
               <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
             </svg>
           </div>
-          <p className="text-gray-900 text-sm font-bold">RealEstate CRM</p>
+          <p className="text-gray-900 text-sm font-bold">PropVault</p>
         </div>
 
-        {/* Nav scrollable */}
+        {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-2 sidebar-scroll">
           {NAV.map(({ group, items }) => (
-            <div key={group ?? '_root'}>
+            <div
+              key={group ?? '_root'}
+              className={group === 'MARKETING' ? 'mt-3 pt-2 border-t border-gray-200' : ''}
+            >
               {group && (
                 <p className="px-4 pt-4 pb-1 text-[9px] font-bold tracking-[0.12em] text-gray-400 uppercase">
                   {group}
@@ -192,7 +229,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                     className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
                       ${isActive(item.path)
                         ? 'bg-primary-50 text-primary-700'
-                          : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
+                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                   >
                     <NavIcon name={item.icon} />
                     {item.label}
@@ -203,7 +240,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
                       onClick={() => toggle(item.label)}
                       style={{ width: 'calc(100% - 16px)' }}
                       className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
-                        ${open.has(item.label) || item.sub?.some(s => isActive(s.path))
+                        ${open.has(item.label) || item.sub?.some((s) => isActive(s.path))
                           ? 'text-primary-700 bg-primary-50/60'
                           : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                     >
@@ -211,7 +248,9 @@ export default function Sidebar({ mobileOpen, onClose }) {
                       <span className="flex-1 text-left">{item.label}</span>
                       <svg
                         className={`w-3 h-3 transition-transform shrink-0 ${open.has(item.label) ? 'rotate-180 text-primary-500' : 'text-gray-400'}`}
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -228,7 +267,9 @@ export default function Sidebar({ mobileOpen, onClose }) {
                                 ? 'text-primary-700 font-semibold bg-primary-50'
                                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
                           >
-                            <span className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`} />
+                            <span
+                              className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`}
+                            />
                             {child.label}
                           </Link>
                         ))}

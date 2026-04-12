@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 
-const SOURCES = ['Website', 'Phone Call', 'Referral', '99acres', 'MagicBricks', 'Facebook', 'Google Ads', 'Instagram', 'LinkedIn', 'Walk-in', 'Direct']
+const SOURCES = ['Walk-in', 'Website', 'Referral', 'Portal - 99acres', 'Portal - MagicBricks', 'Portal - Housing', 'Google Ads', 'Facebook', 'Instagram', 'Cold Call', 'Event', 'Other']
+const NURTURE_STAGES = ['Cold', 'Warm', 'Interested', 'Very Interested', 'Nurtured']
+
+const cls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
 export default function AddLeadPage() {
   const navigate = useNavigate()
@@ -9,208 +13,150 @@ export default function AddLeadPage() {
     name: '',
     phone: '',
     email: '',
-    source: 'Website',
-    stage: 'New',
+    source: 'Walk-in',
+    nurtureStage: 'Cold',
+    leadScore: 3,
     budget: '',
     requirements: '',
     city: '',
-    interestedIn: '',
+    nextFollowUpDate: '',
   })
-  const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState({})
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function set(key, val) {
-    setForm((f) => ({ ...f, [key]: val }))
-    setErrors((e) => ({ ...e, [key]: undefined }))
-  }
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  function validate() {
-    const e = {}
-    if (!form.name.trim()) e.name = 'Required'
-    if (!form.phone.trim()) e.phone = 'Required'
-    if (!form.email.trim()) e.email = 'Required'
-    if (!form.budget) e.budget = 'Required'
-    setErrors(e)
-    return Object.keys(e).length === 0
-  }
-
-  async function handleSubmit(e) {
+  const handleSubmit = async e => {
     e.preventDefault()
-    if (!validate()) return
-    setSaving(true)
-    await new Promise((r) => setTimeout(r, 800))
-    setSaving(false)
-    navigate('/leads')
+    setError('')
+    if (!form.name || !form.phone) {
+      setError('Name and phone are required')
+      return
+    }
+    setLoading(true)
+    try {
+      const payload = {
+        ...form,
+        budget: form.budget ? Number(form.budget) : undefined,
+        leadScore: Number(form.leadScore),
+      }
+      const res = await api.post('/leads', payload)
+      navigate(`/leads/${res.data._id}`)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create lead')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  const inputCls = 'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition placeholder:text-gray-300'
-  const selectCls = 'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition text-gray-700'
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          to="/leads"
-          className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <nav className="text-xs text-gray-400 mb-0.5">
-            <Link to="/leads" className="hover:text-primary-600">Leads</Link>
-            <span className="mx-1">/</span>
-            <span className="text-gray-700">Add Lead</span>
-          </nav>
-          <h2 className="text-xl font-bold text-gray-900">Add New Lead</h2>
-        </div>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Personal Info */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">👤</span>
-            Personal Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Full Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={form.name}
-                onChange={(e) => set('name', e.target.value)}
-                placeholder="e.g. John Doe"
-                className={`${inputCls} ${errors.name ? 'border-red-400 focus:ring-red-400' : ''}`}
-              />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Email <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                placeholder="john@example.com"
-                className={`${inputCls} ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
-              />
-              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                Phone <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={form.phone}
-                onChange={(e) => set('phone', e.target.value)}
-                placeholder="+91 98765 43210"
-                className={`${inputCls} ${errors.phone ? 'border-red-400 focus:ring-red-400' : ''}`}
-              />
-              {errors.phone && <p className="text-xs text-red-500 mt-1">{errors.phone}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">City</label>
-              <input
-                value={form.city}
-                onChange={(e) => set('city', e.target.value)}
-                placeholder="e.g. Mumbai"
-                className={inputCls}
-              />
-            </div>
-          </div>
+          <div className="p-6 max-w-2xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <Link to="/leads" className="hover:text-primary-600">Leads</Link>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">Add Lead</span>
         </div>
 
-        {/* Lead Info */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">📊</span>
-            Lead Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Source <span className="text-red-500">*</span></label>
-              <select value={form.source} onChange={(e) => set('source', e.target.value)} className={selectCls}>
-                {SOURCES.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Stage</label>
-              <select value={form.stage} onChange={(e) => set('stage', e.target.value)} className={selectCls}>
-                <option>New</option>
-                <option>Contacted</option>
-                <option>Site Visit Scheduled</option>
-                <option>Negotiation</option>
-                <option>Hot Lead</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Budget (INR) <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
-                <input
-                  type="number"
-                  value={form.budget}
-                  onChange={(e) => set('budget', e.target.value)}
-                  placeholder="0"
-                  className={`${inputCls} pl-7 ${errors.budget ? 'border-red-400' : ''}`}
-                />
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">👤 Add New Lead</h1>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Personal Info */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">👤 Personal Information</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                <input value={form.name} onChange={e => set('name', e.target.value)} required
+                  className={cls} placeholder="Amit Sharma" />
               </div>
-              {errors.budget && <p className="text-xs text-red-500 mt-1">{errors.budget}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Interested In</label>
-              <input
-                value={form.interestedIn}
-                onChange={(e) => set('interestedIn', e.target.value)}
-                placeholder="e.g. 2BHK, Commercial"
-                className={inputCls}
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                <input value={form.phone} onChange={e => set('phone', e.target.value)} required
+                  className={cls} placeholder="+91 98765 43210" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
+                  className={cls} placeholder="amit@example.com" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input value={form.city} onChange={e => set('city', e.target.value)}
+                  className={cls} placeholder="Hyderabad" />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Requirements */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-md bg-primary-100 text-primary-600 flex items-center justify-center text-xs">📝</span>
-            Requirements
-          </h3>
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Details</label>
-            <textarea
-              value={form.requirements}
-              onChange={(e) => set('requirements', e.target.value)}
-              placeholder="Property requirements, preferences, timeline…"
-              rows={4}
-              className={inputCls}
-            />
+          {/* Lead Info */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">📊 Lead Details</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                <select value={form.source} onChange={e => set('source', e.target.value)} className={cls}>
+                  {SOURCES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nurture Stage</label>
+                <select value={form.nurtureStage} onChange={e => set('nurtureStage', e.target.value)} className={cls}>
+                  {NURTURE_STAGES.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lead Score: <span className="text-primary-600 font-bold">{form.leadScore} ★</span>
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => set('leadScore', i)}
+                      className={`text-xl transition-transform hover:scale-110 ${i <= form.leadScore ? 'text-yellow-400' : 'text-gray-200'}`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Budget (₹)</label>
+                <input type="number" value={form.budget} onChange={e => set('budget', e.target.value)}
+                  className={cls} placeholder="7500000" min="0" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Next Follow-up Date</label>
+                <input type="date" value={form.nextFollowUpDate} onChange={e => set('nextFollowUpDate', e.target.value)}
+                  className={cls} />
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Action bar */}
-        <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-gray-50 py-4 border-t border-gray-200 -mx-6 px-6">
-          <Link to="/leads" className="px-5 py-2.5 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 transition">
-            Cancel
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60"
-          >
-            {saving && (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            )}
-            {saving ? 'Saving…' : 'Add Lead'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
+          {/* Requirements */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">📝 Requirements</h2>
+            <textarea value={form.requirements} onChange={e => set('requirements', e.target.value)}
+              rows={3} className={cls}
+              placeholder="2 BHK, Gachibowli area, ready to move..." />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button type="submit" disabled={loading}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+              {loading ? 'Creating...' : 'Add Lead'}
+            </button>
+            <Link to="/leads" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </div>
+      )
 }

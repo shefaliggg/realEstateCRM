@@ -1,302 +1,186 @@
-import { useState } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import api from '../api/axios'
 
-const MOCK_DEALS = {
-  1: {
-    id: 1,
-    dealName: 'Skyline Residency - 2BHK Apartment',
-    property: 'Skyline Residency',
-    lead: 'Ankit Joshi',
-    stage: 'Proposal Sent',
-    value: 5000000,
-    commission: 150000,
-    closingDate: '2026-05-15',
-    probability: 75,
-    owner: 'Rahul Sharma',
-    created: '2026-03-20',
-    description: 'Premium 2BHK apartment with modern amenities in prime South Mumbai location.',
-    activities: [
-      { date: '2026-04-12', type: 'Proposal Sent', note: 'Pricing proposal sent to lead' },
-      { date: '2026-04-10', type: 'Meeting', note: 'Site visit completed, lead satisfied' },
-      { date: '2026-04-05', type: 'Lead Contacted', note: 'Initial conversation with Ankit' },
-    ],
-  },
-  2: {
-    id: 2,
-    dealName: 'Green Valley Villa - Premium 3BHK',
-    property: 'Green Valley Villa',
-    lead: 'Seema Patel',
-    stage: 'Negotiation',
-    value: 8500000,
-    commission: 255000,
-    closingDate: '2026-04-30',
-    probability: 60,
-    owner: 'Priya Mehta',
-    created: '2026-03-18',
-    description: '3BHK villa with private garden and modern amenities in Pune.',
-    activities: [
-      { date: '2026-04-08', type: 'Negotiation Started', note: 'Price negotiation ongoing' },
-      { date: '2026-04-06', type: 'Meeting', note: 'Property tour with Seema' },
-    ],
-  },
-}
+const STAGES = ['Lead Qualification', 'Needs Analysis', 'Proposal Sent', 'Negotiation', 'Contract Review', 'Won', 'Lost']
 
 const STAGE_STYLES = {
-  'Lead Qualification': 'bg-blue-50 text-blue-700',
-  'Needs Analysis': 'bg-cyan-50 text-cyan-700',
-  'Proposal Sent': 'bg-amber-50 text-amber-700',
-  'Negotiation': 'bg-orange-50 text-orange-700',
-  'Contract Review': 'bg-purple-50 text-purple-700',
-  'Won': 'bg-green-50 text-green-700',
-  'Lost': 'bg-red-50 text-red-700',
+  'Lead Qualification': 'bg-blue-100 text-blue-700',
+  'Needs Analysis': 'bg-purple-100 text-purple-700',
+  'Proposal Sent': 'bg-yellow-100 text-yellow-700',
+  'Negotiation': 'bg-orange-100 text-orange-700',
+  'Contract Review': 'bg-pink-100 text-pink-700',
+  'Won': 'bg-green-100 text-green-700',
+  'Lost': 'bg-red-100 text-red-500',
+}
+
+const UNIT_STATUS_COLORS = {
+  Available: 'bg-green-100 text-green-700',
+  Reserved: 'bg-yellow-100 text-yellow-700',
+  Booked: 'bg-orange-100 text-orange-700',
+  Registered: 'bg-blue-100 text-blue-700',
 }
 
 export default function DealDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const deal = MOCK_DEALS[Number(id)]
-  const [activeTab, setActiveTab] = useState('overview')
+  const [deal, setDeal] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [noteText, setNoteText] = useState('')
+  const [addingNote, setAddingNote] = useState(false)
+  const [updatingStage, setUpdatingStage] = useState(false)
 
-  if (!deal) {
-    return (
-      <div className="p-10 text-center">
-        <p className="text-gray-400 text-sm mb-4">Deal not found.</p>
-        <Link to="/deals" className="text-primary-600 text-sm font-medium hover:underline">
-          Back to Deals
-        </Link>
-      </div>
-    )
+  useEffect(() => {
+    api.get(`/deals/${id}`)
+      .then(r => setDeal(r.data))
+      .catch(() => setError('Failed to load deal'))
+      .finally(() => setLoading(false))
+  }, [id])
+
+  const handleStageChange = async stage => {
+    setUpdatingStage(true)
+    try {
+      const res = await api.put(`/deals/${id}`, { stage })
+      setDeal(res.data)
+    } catch { /* ignore */ }
+    finally { setUpdatingStage(false) }
   }
 
+  const handleAddNote = async e => {
+    e.preventDefault()
+    if (!noteText.trim()) return
+    setAddingNote(true)
+    try {
+      const res = await api.put(`/deals/${id}`, { notes: noteText })
+      setDeal(res.data)
+      setNoteText('')
+    } catch { /* ignore */ }
+    finally { setAddingNote(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Delete this deal? This cannot be undone.')) return
+    try {
+      await api.delete(`/deals/${id}`)
+      navigate('/deals')
+    } catch {
+      alert('Failed to delete deal')
+    }
+  }
+
+  if (loading) return <div className="p-6 text-gray-400">Loading...</div>
+  if (error) return <div className="p-6 text-red-500">{error}</div>
+  if (!deal) return null
+
+  const unit = deal.unit
+  const lead = deal.lead
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 flex-1">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div className="flex-1">
-            <nav className="text-xs text-gray-400 mb-1">
-              <Link to="/deals" className="hover:text-primary-600">
-                Deals
-              </Link>
-              <span className="mx-1">/</span>
-              <span className="text-gray-700">{deal.dealName}</span>
-            </nav>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-xl font-bold text-gray-900">{deal.dealName}</h2>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STAGE_STYLES[deal.stage]}`}>
-                {deal.stage}
-              </span>
-            </div>
+          <div className="p-6 max-w-3xl mx-auto">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <Link to="/deals" className="hover:text-primary-600">Deals</Link>
+          <span>/</span>
+          <span className="text-gray-900 font-medium">{deal.dealName}</span>
+        </div>
+
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{deal.dealName}</h1>
+            <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${STAGE_STYLES[deal.stage] || 'bg-gray-100'}`}>
+              {deal.stage}
+            </span>
           </div>
-        </div>
-
-        <div className="flex gap-2">
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-100 transition">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Edit
-          </button>
-          <button className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition">
-            Update Stage
+          <button onClick={handleDelete}
+            className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">
+            Delete Deal
           </button>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-100 p-1 w-fit">
-            {['overview', 'timeline', 'documents'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 text-sm font-medium rounded transition ${
-                  activeTab === tab
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                {tab === 'overview' ? 'Overview' : tab === 'timeline' ? 'Timeline' : 'Documents'}
+        {/* Stage Stepper */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+          <h3 className="font-semibold text-gray-800 mb-3">📊 Deal Stage</h3>
+          <div className="flex flex-wrap gap-2">
+            {STAGES.map(s => (
+              <button key={s} onClick={() => handleStageChange(s)} disabled={updatingStage}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  deal.stage === s ? `${STAGE_STYLES[s]} border-current` : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}>
+                {s}
               </button>
             ))}
           </div>
-
-          {/* Overview tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-5">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <h3 className="text-sm font-bold text-gray-800 mb-3">Deal Summary</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{deal.description}</p>
-              </div>
-
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <h3 className="text-sm font-bold text-gray-800 mb-4">Deal Details</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase">Property</p>
-                    <p className="text-sm font-medium text-gray-900 mt-1">{deal.property}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase">Lead</p>
-                    <Link to={`/leads/${deal.lead}`} className="text-sm font-medium text-primary-600 hover:underline mt-1">
-                      {deal.lead}
-                    </Link>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase">Deal Value</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">INR {(deal.value / 1000000).toFixed(1)} Cr</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-400 uppercase">Expected Commission</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">INR {(deal.commission / 100000).toFixed(2)} L</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Timeline tab */}
-          {activeTab === 'timeline' && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">Activity Timeline</h3>
-              <div className="space-y-4">
-                {deal.activities.map((activity, i) => (
-                  <div key={i} className="flex gap-3 pb-4 border-b border-gray-100 last:border-0">
-                    <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">
-                        {i + 1}
-                      </div>
-                      {i < deal.activities.length - 1 && <div className="w-0.5 h-8 bg-gray-200 mt-1" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-400">{activity.date}</p>
-                      <p className="text-sm font-semibold text-gray-900 mt-1">{activity.type}</p>
-                      <p className="text-sm text-gray-600 mt-1">{activity.note}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Documents tab */}
-          {activeTab === 'documents' && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-              <h3 className="text-sm font-bold text-gray-800 mb-4">Documents</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {['Agreement', 'Payment Receipt', 'ID Proof', 'Property Document'].map((doc) => (
-                  <div
-                    key={doc}
-                    className="border border-gray-200 rounded-lg p-4 flex items-start justify-between hover:border-primary-300 transition cursor-pointer"
-                  >
-                    <div className="flex items-start gap-3">
-                      <svg className="w-8 h-8 text-primary-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{doc}</p>
-                        <p className="text-xs text-gray-400">Not yet uploaded</p>
-                      </div>
-                    </div>
-                    <button className="text-primary-600 hover:text-primary-800 text-xs font-medium">Upload</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-5">
-          {/* Deal Stats */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-4">Deal Stats</h3>
+        {/* Unit Card */}
+        {unit && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">🏠 Linked Unit</h3>
+            <Link to={`/units/${unit._id}`}
+              className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 hover:bg-primary-50 transition-colors">
+              <div className="flex-1">
+                <p className="font-medium text-gray-900">Block {unit.block} – Unit {unit.unitNo}</p>
+                <p className="text-sm text-gray-500">Floor {unit.floor} · {unit.bhkType}{unit.carpetArea ? ` · ${unit.carpetArea} sqft` : ''}</p>
+              </div>
+              <div className="text-right">
+                {unit.basePrice && <p className="font-medium text-gray-800">₹{(unit.basePrice / 100000).toFixed(1)}L</p>}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${UNIT_STATUS_COLORS[unit.status] || 'bg-gray-100'}`}>
+                  {unit.status}
+                </span>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Lead Card */}
+        {lead && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">👤 Linked Lead</h3>
+            <Link to={`/leads/${lead._id}`}
+              className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-primary-50 transition-colors">
+              <div>
+                <p className="font-medium text-gray-900">{lead.name}</p>
+                <p className="text-sm text-gray-500">{lead.phone}</p>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Financials */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+          <h3 className="font-semibold text-gray-800 mb-3">💰 Financials</h3>
+          <dl className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+            <div><dt className="text-gray-500">Deal Value</dt><dd className="font-semibold mt-0.5 text-gray-900">{deal.value ? `₹${(deal.value / 100000).toFixed(2)}L` : '—'}</dd></div>
+            <div><dt className="text-gray-500">Commission</dt><dd className="font-medium mt-0.5">{deal.commission ? `₹${(deal.commission / 100000).toFixed(2)}L` : '—'}</dd></div>
+            <div><dt className="text-gray-500">Expected Close</dt><dd className="font-medium mt-0.5">{deal.closingDate ? new Date(deal.closingDate).toLocaleDateString() : '—'}</dd></div>
+            <div><dt className="text-gray-500">Probability</dt><dd className="font-medium mt-0.5">{deal.probability ? `${deal.probability}%` : '—'}</dd></div>
+          </dl>
+        </div>
+
+        {/* Activities */}
+        {deal.activities?.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">📋 Activity Log</h3>
             <div className="space-y-3">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs text-gray-500 uppercase">Win Probability</span>
-                  <span className="text-sm font-semibold text-gray-900">{deal.probability}%</span>
+              {[...deal.activities].reverse().map((a, i) => (
+                <div key={i} className="border-l-2 border-primary-200 pl-3">
+                  <p className="text-sm font-medium text-gray-800">{a.type}</p>
+                  {a.note && <p className="text-xs text-gray-600">{a.note}</p>}
+                  <p className="text-xs text-gray-400 mt-0.5">{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}</p>
                 </div>
-                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-600" style={{ width: `${deal.probability}%` }} />
-                </div>
-              </div>
-              <div className="pt-2">
-                <p className="text-xs text-gray-500 uppercase">Created</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{deal.created}</p>
-              </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Owner */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">Deal Owner</h3>
-            <p className="text-sm text-gray-900 font-medium">{deal.owner}</p>
-            <button className="mt-4 w-full text-xs text-primary-600 border border-primary-200 hover:bg-primary-50 rounded-lg py-2 font-medium transition">
-              Reassign Deal
-            </button>
-          </div>
-
-          {/* Timeline Info */}
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-3">Timeline</h3>
-            <div className="space-y-3 text-sm">
-              <div>
-                <p className="text-xs text-gray-400 uppercase">Expected Closing</p>
-                <p className="text-gray-900 font-medium mt-1">{deal.closingDate}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 uppercase">Days Remaining</p>
-                <p className="text-primary-600 font-medium mt-1">
-                  {Math.max(
-                    0,
-                    Math.ceil(
-                      (new Date(deal.closingDate) - new Date()) / (1000 * 60 * 60 * 24)
-                    )
-                  )}
-                  {' '}
-                  days
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Value Summary */}
-          <div className="bg-primary-50 rounded-xl border border-primary-200 p-5">
-            <h3 className="text-sm font-bold text-primary-900 mb-3">Deal Value At Stake</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-primary-700">Deal Value</span>
-                <span className="font-bold text-primary-900">INR {(deal.value / 1000000).toFixed(1)} Cr</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-primary-700">Commission (3%)</span>
-                <span className="font-bold text-primary-900">INR {(deal.commission / 100000).toFixed(2)} L</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2">
-            <button className="flex-1 text-xs px-3 py-2.5 border border-primary-200 text-primary-600 rounded-lg hover:bg-primary-50 font-medium transition">
-              Move Stage
-            </button>
-            <button className="flex-1 text-xs px-3 py-2.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium transition">
-              Mark Lost
-            </button>
-          </div>
+        {/* Notes */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h3 className="font-semibold text-gray-800 mb-3">📝 Notes</h3>
+          {deal.notes && <p className="text-sm text-gray-700 mb-4 whitespace-pre-line">{deal.notes}</p>}
+          {deal.description && <p className="text-sm text-gray-500 italic">{deal.description}</p>}
         </div>
       </div>
-    </div>
-  )
+      )
 }

@@ -4,5 +4,9 @@ import Layout from './Layout'
 
 export default function PrivateRoute({ children }) {
   const { user } = useAuth()
-  return user ? <Layout>{children}</Layout> : <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
+
+  // Guard against accidental nested layout wrappers in page components.
+  const alreadyWrappedWithLayout = children?.type === Layout
+  return alreadyWrappedWithLayout ? children : <Layout>{children}</Layout>
 }

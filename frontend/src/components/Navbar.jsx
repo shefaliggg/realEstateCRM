@@ -17,7 +17,7 @@ export default function Navbar() {
           <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
             <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
           </svg>
-          RealEstate CRM
+          PropVault
         </Link>
 
         <div className="flex items-center gap-4">

@@ -8,6 +8,10 @@ dotenv.config();
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const projectRoutes = require('./routes/projectRoutes');
+const unitRoutes = require('./routes/unitRoutes');
+const leadRoutes = require('./routes/leadRoutes');
+const dealRoutes = require('./routes/dealRoutes');
 
 const app = express();
 
@@ -34,6 +38,11 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/projects/:projectId/units', unitRoutes);
+app.use('/api/units', unitRoutes); // direct unit lookup by id
+app.use('/api/leads', leadRoutes);
+app.use('/api/deals', dealRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -42,7 +42,7 @@ export default function LoginPage() {
                 <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">RealEstate CRM</h1>
+            <h1 className="text-2xl font-bold text-gray-900">PropVault</h1>
             <div className="flex items-center gap-2 mt-2">
               <span className="w-2 h-2 rounded-full bg-primary-500"></span>
               <p className="text-sm text-gray-500 font-medium">Admin Portal</p>
