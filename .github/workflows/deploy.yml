@@ -8,15 +8,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          FRONTEND_ROOT: ${{ secrets.FRONTEND_ROOT }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            set -e
+
             cd /var/www/app
 
             echo "Pull latest code"
@@ -24,15 +28,22 @@ jobs:
 
             echo "Backend setup"
             cd backend
-            npm install
+            npm ci
 
             echo "Frontend build"
             cd ../frontend
-            npm install
+            npm ci
             npm run build
+
+            echo "Publish frontend dist to NGINX root"
+            if [ -z "$FRONTEND_ROOT" ]; then
+              FRONTEND_ROOT="/var/www/html"
+            fi
+            sudo mkdir -p "$FRONTEND_ROOT"
+            sudo rsync -a --delete dist/ "$FRONTEND_ROOT/"
 
             echo "Restart backend"
             pm2 restart all
 
             echo "Reload nginx"
-            systemctl reload nginx
+            sudo systemctl reload nginx
