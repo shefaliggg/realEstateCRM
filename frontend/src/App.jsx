@@ -7,6 +7,7 @@ import ProjectsPage from './pages/ProjectsPage'
 import AddProjectPage from './pages/AddProjectPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import InventoryPage from './pages/InventoryPage'
+import BlockPage from './pages/BlockPage'
 import UnitDetailPage from './pages/UnitDetailPage'
 import AddUnitPage from './pages/AddUnitPage'
 import AllLeadsPage from './pages/AllLeadsPage'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/projects/add" element={<PR><AddProjectPage /></PR>} />
           <Route path="/projects/:id" element={<PR><ProjectDetailPage /></PR>} />
           <Route path="/inventory" element={<PR><InventoryPage /></PR>} />
+          <Route path="/projects/:projectId/blocks/:block" element={<PR><BlockPage /></PR>} />
           <Route path="/projects/:projectId/units/add" element={<PR><AddUnitPage /></PR>} />
           <Route path="/units/:id" element={<PR><UnitDetailPage /></PR>} />
 

@@ -1,34 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
-
-const UNIT_STATUS_COLORS = {
-  Available: 'bg-green-100 text-green-700 border-green-200',
-  Reserved: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  Booked: 'bg-orange-100 text-orange-700 border-orange-200',
-  Registered: 'bg-blue-100 text-blue-700 border-blue-200',
-  Cancelled: 'bg-red-100 text-red-500 border-red-200',
-}
-
-const LEGEND = [
-  { label: 'Available', color: 'bg-green-400' },
-  { label: 'Reserved', color: 'bg-yellow-400' },
-  { label: 'Booked', color: 'bg-orange-400' },
-  { label: 'Registered', color: 'bg-blue-400' },
-  { label: 'Cancelled', color: 'bg-red-300' },
-]
 
 export default function ProjectDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [project, setProject] = useState(null)
   const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('inventory')
-  const [blockFilter, setBlockFilter] = useState('All')
-  const [bhkFilter, setBhkFilter] = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [tab, setTab] = useState('blocks')
+  const [newBlock, setNewBlock] = useState('')
+  const [addingBlock, setAddingBlock] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -43,15 +25,6 @@ export default function ProjectDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  const filteredUnits = units.filter(u => {
-    if (blockFilter !== 'All' && u.block !== blockFilter) return false
-    if (bhkFilter !== 'All' && u.bhkType !== bhkFilter) return false
-    if (statusFilter !== 'All' && u.status !== statusFilter) return false
-    return true
-  })
-
-  // Group by floor for matrix view
-  const floors = [...new Set(filteredUnits.map(u => u.floor))].sort((a, b) => b - a)
   const blocks = project?.blocks || []
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>
@@ -64,6 +37,24 @@ export default function ProjectDetailPage() {
     reserved: units.filter(u => u.status === 'Reserved').length,
     booked: units.filter(u => u.status === 'Booked').length,
     registered: units.filter(u => u.status === 'Registered').length,
+  }
+
+  const handleAddBlock = async () => {
+    const value = newBlock.trim()
+    if (!value || addingBlock) return
+    if (blocks.some(b => b.toLowerCase() === value.toLowerCase())) return
+
+    setAddingBlock(true)
+    try {
+      const updatedBlocks = [...blocks, value]
+      const res = await api.put(`/projects/${id}`, { blocks: updatedBlocks })
+      setProject(prev => ({ ...prev, ...res.data }))
+      setNewBlock('')
+    } catch {
+      setError('Failed to add block')
+    } finally {
+      setAddingBlock(false)
+    }
   }
 
   return (
@@ -114,7 +105,7 @@ export default function ProjectDetailPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 mb-5">
-          {['inventory', 'overview'].map(t => (
+          {['blocks', 'overview'].map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -127,76 +118,74 @@ export default function ProjectDetailPage() {
           ))}
         </div>
 
-        {tab === 'inventory' && (
+        {tab === 'blocks' && (
           <div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-5">
-              <select
-                value={blockFilter}
-                onChange={e => setBlockFilter(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
-              >
-                <option value="All">All Blocks</option>
-                {blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
-              </select>
-              <select
-                value={bhkFilter}
-                onChange={e => setBhkFilter(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
-              >
-                <option value="All">All BHK</option>
-                {project.bhkTypes?.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
-              >
-                {['All', 'Available', 'Reserved', 'Booked', 'Registered', 'Cancelled'].map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <span className="text-sm text-gray-400 self-center">{filteredUnits.length} units</span>
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={newBlock}
+                  onChange={e => setNewBlock(e.target.value)}
+                  placeholder="Add block name (e.g. B, Tower-1, Podium)"
+                  className="flex-1 min-w-[220px] border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddBlock}
+                  disabled={addingBlock || !newBlock.trim()}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                >
+                  {addingBlock ? 'Adding...' : '+ Add Block'}
+                </button>
+              </div>
             </div>
 
-            {/* Legend */}
-            <div className="flex flex-wrap gap-3 mb-4">
-              {LEGEND.map(l => (
-                <span key={l.label} className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <span className={`w-3 h-3 rounded ${l.color}`} />
-                  {l.label}
-                </span>
-              ))}
-            </div>
-
-            {/* Unit grid */}
-            {filteredUnits.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                No units match the selected filters.{' '}
-                <Link to={`/projects/${id}/units/add`} className="text-primary-600 hover:underline">Add units</Link>
+            {blocks.length === 0 ? (
+              <div className="text-center py-12 text-gray-400 text-sm">
+                No blocks configured.{' '}
+                <Link to={`/projects/edit/${id}`} className="text-primary-600 hover:underline">Edit project</Link> to add blocks.
               </div>
             ) : (
-              <div className="space-y-2">
-                {floors.map(floor => (
-                  <div key={floor} className="flex items-center gap-2">
-                    <span className="w-16 text-xs text-gray-400 font-medium text-right">Floor {floor}</span>
-                    <div className="flex flex-wrap gap-2">
-                      {filteredUnits
-                        .filter(u => u.floor === floor)
-                        .sort((a, b) => a.unitNo - b.unitNo)
-                        .map(u => (
-                          <Link
-                            key={u._id}
-                            to={`/units/${u._id}`}
-                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:opacity-80 transition-opacity ${UNIT_STATUS_COLORS[u.status] || 'bg-gray-100 text-gray-600'}`}
-                            title={`${u.bhkType} · ${u.carpetArea} sqft · ₹${(u.basePrice / 100000).toFixed(1)}L`}
-                          >
-                            {u.block}-{u.unitNo}
-                          </Link>
-                        ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {blocks.map(b => {
+                  const bu = units.filter(u => u.block === b)
+                  const bTotal = bu.length || 1
+                  const bAvail = bu.filter(u => u.status === 'Available').length
+                  const bReserved = bu.filter(u => u.status === 'Reserved').length
+                  const bBooked = bu.filter(u => u.status === 'Booked').length
+                  const bReg = bu.filter(u => u.status === 'Registered').length
+                  return (
+                    <Link
+                      key={b}
+                      to={`/projects/${id}/blocks/${encodeURIComponent(b)}`}
+                      className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md hover:border-primary-200 transition-all"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                          <span className="text-primary-700 font-bold text-xs">Blk {b}</span>
+                        </div>
+                        <span className="text-xs text-gray-400">{bu.length} flats</span>
+                      </div>
+                      <div className="flex h-1.5 rounded-full overflow-hidden mb-3">
+                        <div className="bg-green-400" style={{ width: `${(bAvail / bTotal) * 100}%` }} />
+                        <div className="bg-yellow-400" style={{ width: `${(bReserved / bTotal) * 100}%` }} />
+                        <div className="bg-orange-400" style={{ width: `${(bBooked / bTotal) * 100}%` }} />
+                        <div className="bg-blue-400" style={{ width: `${(bReg / bTotal) * 100}%` }} />
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-green-600 font-medium">{bAvail} avail</span>
+                        <span className="text-orange-600 font-medium">{bBooked} booked</span>
+                      </div>
+                    </Link>
+                  )
+                })}
+                {/* Quick-add tile */}
+                <Link
+                  to={`/projects/${id}/units/add`}
+                  className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-primary-300 hover:bg-primary-50/30 transition-all min-h-[120px]"
+                >
+                  <span className="text-2xl text-gray-300">+</span>
+                  <span className="text-sm font-medium text-gray-400">Add Flat</span>
+                </Link>
               </div>
             )}
           </div>

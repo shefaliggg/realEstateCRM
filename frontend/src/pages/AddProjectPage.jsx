@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 
-const BLOCKS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+const BLOCK_PRESETS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const BHK_TYPES = ['2 BHK', '2.5 BHK', '3 BHK']
 
 export default function AddProjectPage() {
@@ -25,17 +25,25 @@ export default function AddProjectPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [newBlock, setNewBlock] = useState('')
 
   const handleChange = e => {
     const { name, value } = e.target
     setForm(f => ({ ...f, [name]: value }))
   }
 
-  const toggleBlock = b => {
-    setForm(f => ({
-      ...f,
-      blocks: f.blocks.includes(b) ? f.blocks.filter(x => x !== b) : [...f.blocks, b],
-    }))
+  const addBlock = b => {
+    const value = String(b || '').trim()
+    if (!value) return
+    setForm(f => {
+      const exists = f.blocks.some(x => x.toLowerCase() === value.toLowerCase())
+      if (exists) return f
+      return { ...f, blocks: [...f.blocks, value] }
+    })
+  }
+
+  const removeBlock = b => {
+    setForm(f => ({ ...f, blocks: f.blocks.filter(x => x !== b) }))
   }
 
   const toggleBhk = b => {
@@ -52,10 +60,15 @@ export default function AddProjectPage() {
       setError('Project name and developer name are required')
       return
     }
+    if (form.blocks.length === 0) {
+      setError('Add at least one block')
+      return
+    }
     setLoading(true)
     try {
       const payload = {
         ...form,
+        blocks: [...new Set(form.blocks.map(b => b.trim()).filter(Boolean))],
         totalUnits: form.totalUnits ? Number(form.totalUnits) : undefined,
         location: { locality: form.locality, city: form.city },
         amenities: form.amenities ? form.amenities.split(',').map(a => a.trim()).filter(Boolean) : [],
@@ -154,16 +167,49 @@ export default function AddProjectPage() {
           {/* Blocks */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">🏢 Blocks</h2>
-            <div className="flex flex-wrap gap-2">
-              {BLOCKS.map(b => (
-                <button type="button" key={b} onClick={() => toggleBlock(b)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    form.blocks.includes(b)
-                      ? 'bg-primary-600 text-white border-primary-600'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}>
-                  Block {b}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {BLOCK_PRESETS.map(b => (
+                <button
+                  type="button"
+                  key={b}
+                  onClick={() => addBlock(b)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  + {b}
                 </button>
+              ))}
+            </div>
+            <div className="flex gap-2 mb-3">
+              <input
+                value={newBlock}
+                onChange={e => setNewBlock(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                placeholder="Add custom block name (e.g. Tower-1, Podium)"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  addBlock(newBlock)
+                  setNewBlock('')
+                }}
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {form.blocks.length === 0 && <span className="text-xs text-gray-400">No blocks added yet</span>}
+              {form.blocks.map(b => (
+                <span key={b} className="inline-flex items-center gap-2 bg-primary-50 text-primary-700 px-3 py-1 rounded-full text-sm font-medium">
+                  {b}
+                  <button
+                    type="button"
+                    onClick={() => removeBlock(b)}
+                    className="text-primary-600 hover:text-primary-800"
+                  >
+                    x
+                  </button>
+                </span>
               ))}
             </div>
           </div>

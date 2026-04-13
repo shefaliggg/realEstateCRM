@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
@@ -7,9 +7,11 @@ const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'S
 export default function AddUnitPage() {
   const { projectId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const blockFromUrl = searchParams.get('block') || ''
   const [project, setProject] = useState(null)
   const [form, setForm] = useState({
-    block: '',
+    block: blockFromUrl,
     floor: '',
     unitNo: '',
     bhkType: '2 BHK',
@@ -24,7 +26,7 @@ export default function AddUnitPage() {
     api.get(`/projects/${projectId}`)
       .then(r => {
         setProject(r.data)
-        if (r.data.blocks?.length > 0) setForm(f => ({ ...f, block: r.data.blocks[0] }))
+        if (!blockFromUrl && r.data.blocks?.length > 0) setForm(f => ({ ...f, block: r.data.blocks[0] }))
         if (r.data.bhkTypes?.length > 0) setForm(f => ({ ...f, bhkType: r.data.bhkTypes[0] }))
       })
       .catch(() => setError('Failed to load project'))
@@ -51,7 +53,7 @@ export default function AddUnitPage() {
         carpetArea: form.carpetArea ? Number(form.carpetArea) : undefined,
         basePrice: form.basePrice ? Number(form.basePrice) : undefined,
       })
-      navigate(`/projects/${projectId}`)
+      navigate(blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create unit')
     } finally {
@@ -70,11 +72,17 @@ export default function AddUnitPage() {
               <Link to={`/projects/${projectId}`} className="hover:text-primary-600">{project.name}</Link>
             </>
           )}
+          {blockFromUrl && (
+            <>
+              <span>/</span>
+              <Link to={`/projects/${projectId}/blocks/${blockFromUrl}`} className="hover:text-primary-600">Block {blockFromUrl}</Link>
+            </>
+          )}
           <span>/</span>
-          <span className="text-gray-900 font-medium">Add Unit</span>
+          <span className="text-gray-900 font-medium">Add Flat</span>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">🏠 Add Unit</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">🏠 Add Flat{blockFromUrl ? ` — Block ${blockFromUrl}` : ''}</h1>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>
@@ -86,7 +94,11 @@ export default function AddUnitPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Block *</label>
-                {project?.blocks?.length > 0 ? (
+                {blockFromUrl ? (
+                  <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+                    Block {blockFromUrl}
+                  </div>
+                ) : project?.blocks?.length > 0 ? (
                   <select name="block" value={form.block} onChange={handleChange}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
                     {project.blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
@@ -151,7 +163,7 @@ export default function AddUnitPage() {
               className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
               {loading ? 'Adding...' : 'Add Unit'}
             </button>
-            <Link to={`/projects/${projectId}`}
+            <Link to={blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`}
               className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
               Cancel
             </Link>
