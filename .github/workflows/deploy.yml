@@ -1,4 +1,4 @@
-name: Deploy to Server
+name: Deploy
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
@@ -19,20 +19,20 @@ jobs:
           script: |
             cd /var/www/app
 
-            echo "Pulling latest code..."
+            echo "Pull latest code"
             git pull origin main
 
-            echo "Installing backend dependencies..."
+            echo "Backend setup"
             cd backend
             npm install
 
-            echo "Installing frontend dependencies..."
+            echo "Frontend build"
             cd ../frontend
             npm install
             npm run build
 
-            echo "Restarting backend..."
+            echo "Restart backend"
             pm2 restart all
 
-            echo "Reloading NGINX..."
-            sudo systemctl reload nginx
+            echo "Reload nginx"
+            systemctl reload nginx
