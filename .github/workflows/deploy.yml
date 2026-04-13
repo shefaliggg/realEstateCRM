@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy to Server
 
 on:
   push:
@@ -10,40 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to server
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          FRONTEND_ROOT: ${{ secrets.FRONTEND_ROOT }}
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: 22
           script: |
-            set -e
+            echo "🚀 Starting deployment..."
 
             cd /var/www/app
 
-            echo "Pull latest code"
-            git pull origin main
+            echo "📥 Fetching latest code..."
+            git fetch origin
+            git reset --hard origin/main
 
-            echo "Backend setup"
+            echo "📦 Installing backend dependencies..."
             cd backend
-            npm ci
+            npm install
 
-            echo "Frontend build"
+            echo "🏗️ Building frontend..."
             cd ../frontend
-            npm ci
+            npm install
             npm run build
 
-            echo "Publish frontend dist to NGINX root"
-            if [ -z "$FRONTEND_ROOT" ]; then
-              FRONTEND_ROOT="/var/www/html"
-            fi
-            sudo mkdir -p "$FRONTEND_ROOT"
-            sudo rsync -a --delete dist/ "$FRONTEND_ROOT/"
+            echo "🔄 Restarting backend..."
+            pm2 restart all || pm2 start server.js
 
-            echo "Restart backend"
-            pm2 restart all
+            echo "🔁 Reloading NGINX..."
+            systemctl reload nginx
 
-            echo "Reload nginx"
-            sudo systemctl reload nginx
+            echo "✅ Deployment completed!"
