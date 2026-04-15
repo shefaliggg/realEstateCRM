@@ -126,7 +126,6 @@ export default function LeadNurturePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Lead Nurture Board</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Drag leads through nurture stages</p>
           </div>
           <Link
             to="/leads/add"

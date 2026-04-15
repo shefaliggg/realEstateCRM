@@ -58,8 +58,7 @@ export default function DealPipelinePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Sales Pipeline</h2>
-          <p className="text-sm text-gray-500 mt-0.5">Drag deals across stages | Total Value: INR {(totalValue / 10000000).toFixed(1)} Cr</p>
+          <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
         </div>
         <Link
           to="/deals/add"

@@ -46,7 +46,6 @@ export default function RegisterPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-sm text-gray-500 mt-1">Join PropVault today</p>
         </div>
 
         {error && (

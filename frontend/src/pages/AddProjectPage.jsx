@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 
 const BLOCK_PRESETS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-const BHK_TYPES = ['2 BHK', '2.5 BHK', '3 BHK']
+const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
 
 export default function AddProjectPage() {
   const navigate = useNavigate()
@@ -14,8 +14,12 @@ export default function AddProjectPage() {
     status: 'Under Construction',
     reraNo: '',
     totalUnits: '',
+    address: '',
     locality: '',
     city: '',
+    state: '',
+    pincode: '',
+    googleMapLink: '',
     launchDate: '',
     possessionDate: '',
     blocks: [],
@@ -26,6 +30,26 @@ export default function AddProjectPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [newBlock, setNewBlock] = useState('')
+  const [newBhkType, setNewBhkType] = useState('')
+  const [imageFiles, setImageFiles] = useState([])
+  const [videoFiles, setVideoFiles] = useState([])
+  const imageFilesRef = useRef([])
+  const videoFilesRef = useRef([])
+
+  useEffect(() => {
+    imageFilesRef.current = imageFiles
+  }, [imageFiles])
+
+  useEffect(() => {
+    videoFilesRef.current = videoFiles
+  }, [videoFiles])
+
+  useEffect(() => {
+    return () => {
+      imageFilesRef.current.forEach((image) => URL.revokeObjectURL(image.preview))
+      videoFilesRef.current.forEach((video) => URL.revokeObjectURL(video.preview))
+    }
+  }, [])
 
   const handleChange = e => {
     const { name, value } = e.target
@@ -53,6 +77,75 @@ export default function AddProjectPage() {
     }))
   }
 
+  const addCustomBhkType = () => {
+    const value = newBhkType.trim()
+    if (!value) return
+    setForm((prev) => {
+      const exists = prev.bhkTypes.some((type) => type.toLowerCase() === value.toLowerCase())
+      if (exists) return prev
+      return { ...prev, bhkTypes: [...prev.bhkTypes, value] }
+    })
+    setNewBhkType('')
+  }
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setImageFiles((prev) => {
+      const next = [...prev]
+      files.forEach((file) => {
+        next.push({
+          id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          preview: URL.createObjectURL(file),
+        })
+      })
+      return next
+    })
+
+    e.target.value = ''
+  }
+
+  const removeImage = (imageId) => {
+    setImageFiles((prev) => {
+      const imageToRemove = prev.find((image) => image.id === imageId)
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.preview)
+      }
+      return prev.filter((image) => image.id !== imageId)
+    })
+  }
+
+  const handleVideoChange = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    setVideoFiles((prev) => {
+      const next = [...prev]
+      files.forEach((file) => {
+        next.push({
+          id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+          file,
+          preview: URL.createObjectURL(file),
+        })
+      })
+      return next
+    })
+
+    e.target.value = ''
+  }
+
+  const removeVideo = (videoId) => {
+    setVideoFiles((prev) => {
+      const videoToRemove = prev.find((video) => video.id === videoId)
+      if (videoToRemove) {
+        URL.revokeObjectURL(videoToRemove.preview)
+      }
+      return prev.filter((video) => video.id !== videoId)
+    })
+  }
+
   const handleSubmit = async e => {
     e.preventDefault()
     setError('')
@@ -66,16 +159,39 @@ export default function AddProjectPage() {
     }
     setLoading(true)
     try {
-      const payload = {
-        ...form,
-        blocks: [...new Set(form.blocks.map(b => b.trim()).filter(Boolean))],
-        totalUnits: form.totalUnits ? Number(form.totalUnits) : undefined,
-        location: { locality: form.locality, city: form.city },
-        amenities: form.amenities ? form.amenities.split(',').map(a => a.trim()).filter(Boolean) : [],
-      }
-      delete payload.locality
-      delete payload.city
-      const res = await api.post('/projects', payload)
+      const formData = new FormData()
+      formData.append('name', form.name)
+      formData.append('developerName', form.developerName)
+      formData.append('type', form.type)
+      formData.append('status', form.status)
+      formData.append('reraNo', form.reraNo)
+      formData.append('totalUnits', form.totalUnits)
+      formData.append('address', form.address)
+      formData.append('locality', form.locality)
+      formData.append('city', form.city)
+      formData.append('state', form.state)
+      formData.append('pincode', form.pincode)
+      formData.append('googleMapLink', form.googleMapLink)
+      formData.append('launchDate', form.launchDate)
+      formData.append('possessionDate', form.possessionDate)
+      formData.append('description', form.description)
+      formData.append('blocks', JSON.stringify([...new Set(form.blocks.map(b => b.trim()).filter(Boolean))]))
+      formData.append('bhkTypes', JSON.stringify(form.bhkTypes))
+      formData.append('amenities', JSON.stringify(form.amenities ? form.amenities.split(',').map(a => a.trim()).filter(Boolean) : []))
+
+      imageFiles.forEach(({ file }) => {
+        formData.append('images', file)
+      })
+
+      videoFiles.forEach(({ file }) => {
+        formData.append('videos', file)
+      })
+
+      const res = await api.post('/projects', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
       navigate(`/projects/${res.data._id}`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create project')
@@ -100,6 +216,77 @@ export default function AddProjectPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-4">🖼 Project Images</h2>
+            <div>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:border-primary-300 hover:bg-primary-50/40 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <span className="text-sm font-medium text-gray-700">Upload Images</span>
+                <span className="text-xs text-gray-500">PNG, JPG, WEBP</span>
+              </label>
+
+              {imageFiles.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {imageFiles.map((image) => (
+                    <div key={image.id} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                      <img src={image.preview} alt={image.file.name} className="h-28 w-full object-cover" />
+                      <div className="flex items-center justify-between gap-2 p-2">
+                        <p className="truncate text-xs text-gray-600">{image.file.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(image.id)}
+                          className="text-xs font-medium text-red-500 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:border-primary-300 hover:bg-primary-50/40 transition-colors">
+                <input
+                  type="file"
+                  accept="video/*"
+                  multiple
+                  onChange={handleVideoChange}
+                  className="hidden"
+                />
+                <span className="text-sm font-medium text-gray-700">Upload Videos</span>
+                <span className="text-xs text-gray-500">MP4, MOV, WEBM</span>
+              </label>
+
+              {videoFiles.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {videoFiles.map((video) => (
+                    <div key={video.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-gray-700">{video.file.name}</p>
+                        <p className="text-xs text-gray-500">{Math.round(video.file.size / 1024 / 1024)} MB</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeVideo(video.id)}
+                        className="text-xs font-medium text-red-500 hover:text-red-600"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Basic Info */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">📋 Basic Information</h2>
@@ -149,6 +336,12 @@ export default function AddProjectPage() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">📍 Location</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input name="address" value={form.address} onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  placeholder="Street address or landmark" />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Locality</label>
                 <input name="locality" value={form.locality} onChange={handleChange}
@@ -160,6 +353,24 @@ export default function AddProjectPage() {
                 <input name="city" value={form.city} onChange={handleChange}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                   placeholder="Hyderabad" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+                <input name="state" value={form.state} onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  placeholder="Telangana" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pincode</label>
+                <input name="pincode" value={form.pincode} onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  placeholder="500032" />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Google Map Link</label>
+                <input name="googleMapLink" value={form.googleMapLink} onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  placeholder="https://maps.google.com/..." />
               </div>
             </div>
           </div>
@@ -228,6 +439,21 @@ export default function AddProjectPage() {
                   {b}
                 </button>
               ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <input
+                value={newBhkType}
+                onChange={(e) => setNewBhkType(e.target.value)}
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                placeholder="Add custom flat type (e.g. 6 BHK, Villa Suite)"
+              />
+              <button
+                type="button"
+                onClick={addCustomBhkType}
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Add
+              </button>
             </div>
           </div>
 

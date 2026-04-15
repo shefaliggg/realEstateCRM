@@ -18,6 +18,9 @@ const protect = async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'User not found' });
     }
+    if (!req.user.isActive) {
+      return res.status(403).json({ message: 'Account deactivated' });
+    }
     next();
   } catch {
     res.status(401).json({ message: 'Not authorized, token invalid' });
@@ -31,4 +34,11 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly };
+const allowRoles = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access denied: insufficient permissions' });
+  }
+  next();
+};
+
+module.exports = { protect, adminOnly, allowRoles };

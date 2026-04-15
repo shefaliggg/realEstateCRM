@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import PrivateRoute from './components/PrivateRoute'
 import LoginPage from './pages/LoginPage'
+import AcceptInvitePage from './pages/AcceptInvitePage'
+import UsersRolesPage from './pages/UsersRolesPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
 import AddProjectPage from './pages/AddProjectPage'
@@ -21,9 +23,13 @@ import AddDealPage from './pages/AddDealPage'
 import DealDetailPage from './pages/DealDetailPage'
 import DealPipelinePage from './pages/DealPipelinePage'
 import MyDealsPage from './pages/MyDealsPage'
+import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
+import PermissionsPage from './pages/PermissionsPage'
+import UserProfilePage from './pages/UserProfilePage'
 
-function PR({ children }) {
-  return <PrivateRoute>{children}</PrivateRoute>
+function PR({ children, allowedRoles }) {
+  return <PrivateRoute allowedRoles={allowedRoles}>{children}</PrivateRoute>
 }
 
 export default function App() {
@@ -32,6 +38,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/accept-invite/:token" element={<AcceptInvitePage />} />
           <Route path="/dashboard" element={<PR><DashboardPage /></PR>} />
 
           {/* Projects + Inventory */}
@@ -57,6 +64,13 @@ export default function App() {
           <Route path="/deals/mine" element={<PR><MyDealsPage /></PR>} />
           <Route path="/deals/pipeline" element={<PR><DealPipelinePage /></PR>} />
           <Route path="/deals/:id" element={<PR><DealDetailPage /></PR>} />
+
+          {/* Users and Roles */}
+          <Route path="/users" element={<PR allowedRoles={['admin']}><UsersRolesPage /></PR>} />
+          <Route path="/users/:id" element={<PR allowedRoles={['admin']}><UserProfilePage /></PR>} />
+          <Route path="/permissions" element={<PR allowedRoles={['admin']}><PermissionsPage /></PR>} />
+          <Route path="/profile" element={<PR><ProfilePage /></PR>} />
+          <Route path="/settings" element={<PR><SettingsPage /></PR>} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

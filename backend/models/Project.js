@@ -20,6 +20,7 @@ const projectSchema = new mongoose.Schema(
       city: String,
       state: String,
       pincode: String,
+      googleMapLink: String,
     },
     reraNo: { type: String, trim: true },
     launchDate: Date,
@@ -28,8 +29,11 @@ const projectSchema = new mongoose.Schema(
     blocks: [{ type: String }],       // e.g. ['A','B','C','D','E','F','G','H']
     bhkTypes: [{ type: String }],     // e.g. ['2 BHK', '2.5 BHK', '3 BHK']
     description: String,
+    images: [{ type: String, trim: true }],
+    videos: [{ type: String, trim: true }],
     amenities: [{ type: String }],
     highlights: [{ type: String }],
+    managedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

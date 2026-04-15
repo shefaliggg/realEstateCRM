@@ -51,7 +51,6 @@ export default function AllDealsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">All Deals</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Track deals linked to inventory units</p>
           </div>
           <Link to="/deals/add"
             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">

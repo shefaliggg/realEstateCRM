@@ -86,7 +86,6 @@ export default function DashboardPage() {
         {/* Welcome */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user?.name} 👋</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Here's PropVault at a glance today.</p>
         </div>
 
         {/* Top stats */}

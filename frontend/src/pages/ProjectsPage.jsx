@@ -10,41 +10,6 @@ const STATUS_COLORS = {
   'Completed': 'bg-gray-100 text-gray-700',
 }
 
-const UNIT_STATUS_COLORS = {
-  available: 'bg-green-500',
-  reserved: 'bg-yellow-400',
-  booked: 'bg-orange-500',
-  registered: 'bg-blue-500',
-  cancelled: 'bg-red-400',
-}
-
-function InventoryBar({ stats }) {
-  const total = stats?.total || 1
-  const available = stats?.available || 0
-  const reserved = stats?.reserved || 0
-  const booked = stats?.booked || 0
-  const registered = stats?.registered || 0
-
-  return (
-    <div>
-      <div className="flex h-3 rounded-full overflow-hidden mb-2">
-        <div className="bg-green-500" style={{ width: `${(available / total) * 100}%` }} title={`Available: ${available}`} />
-        <div className="bg-yellow-400" style={{ width: `${(reserved / total) * 100}%` }} title={`Reserved: ${reserved}`} />
-        <div className="bg-orange-500" style={{ width: `${(booked / total) * 100}%` }} title={`Booked: ${booked}`} />
-        <div className="bg-blue-500" style={{ width: `${(registered / total) * 100}%` }} title={`Registered: ${registered}`} />
-      </div>
-      <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-        {Object.entries({ Available: available, Reserved: reserved, Booked: booked, Registered: registered }).map(([k, v]) => (
-          <span key={k} className="flex items-center gap-1">
-            <span className={`w-2 h-2 rounded-full ${UNIT_STATUS_COLORS[k.toLowerCase()]}`} />
-            {k}: {v}
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export default function ProjectsPage() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
@@ -63,7 +28,6 @@ export default function ProjectsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Projects</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Developer project inventory</p>
           </div>
           <Link
             to="/projects/add"
@@ -88,13 +52,28 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {projects.map(project => (
             <Link
               key={project._id}
               to={`/projects/${project._id}`}
               className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 block"
             >
+              <div className="mb-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                {project.images?.[0] ? (
+                  <img
+                    src={project.images[0]}
+                    alt={project.name}
+                    className="h-44 w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="h-44 w-full bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center text-gray-400 text-sm font-medium">
+                    No image available
+                  </div>
+                )}
+              </div>
+
               {/* Top row */}
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -115,9 +94,6 @@ export default function ProjectsPage() {
                 {project.bhkTypes?.length > 0 && <span>🛏 {project.bhkTypes.join(' | ')}</span>}
                 {project.reraNo && <span>📋 RERA: {project.reraNo}</span>}
               </div>
-
-              {/* Inventory bar */}
-              <InventoryBar stats={project.inventoryStats} />
             </Link>
           ))}
         </div>

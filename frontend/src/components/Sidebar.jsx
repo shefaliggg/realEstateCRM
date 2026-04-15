@@ -1,5 +1,7 @@
-﻿import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+﻿import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { getRoleModulePermissions } from '../utils/rolePermissions'
 
 const NAV = [
   {
@@ -55,10 +57,9 @@ const NAV = [
         ],
       },
       {
-        label: 'Users & Roles', icon: 'user', sub: [
-          { label: 'All Users', path: '/users' },
-          { label: 'Create User', path: '/users/create' },
-          { label: 'Roles & Permissions', path: '/users/roles' },
+        label: 'Users & Roles', icon: 'user', adminOnly: true, sub: [
+          { label: 'Manage Users', path: '/users' },
+          { label: 'Permissions', path: '/permissions' },
         ],
       },
       {
@@ -173,9 +174,36 @@ function getInitialOpen(pathname) {
   return open
 }
 
-export default function Sidebar({ mobileOpen, onClose }) {
+export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(() => getInitialOpen(location.pathname))
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [sectionOpen, setSectionOpen] = useState({ CORE: false, MARKETING: false })
+  const [, setPermissionsVersion] = useState(0)
+
+  const { user: authUser } = useAuth()
+  const user = userProp ?? authUser
+  const roleModulePermissions = getRoleModulePermissions(user?.role)
+
+  useEffect(() => {
+    const syncPermissions = () => setPermissionsVersion((v) => v + 1)
+    window.addEventListener('role-permissions-updated', syncPermissions)
+    return () => window.removeEventListener('role-permissions-updated', syncPermissions)
+  }, [])
+
+  function handleLogout() {
+    setUserMenuOpen(false)
+    onClose?.()
+    if (onLogout) {
+      onLogout()
+    }
+    navigate('/login')
+  }
+
+  const initials = user?.name
+    ? user.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+    : 'A'
 
   const toggle = (label) =>
     setOpen((prev) => {
@@ -183,6 +211,13 @@ export default function Sidebar({ mobileOpen, onClose }) {
       next.has(label) ? next.delete(label) : next.add(label)
       return next
     })
+
+  const toggleSection = (group) => {
+    setSectionOpen((prev) => ({
+      ...prev,
+      [group]: !prev[group],
+    }))
+  }
 
   const isActive = (path) => location.pathname === path
 
@@ -193,7 +228,7 @@ export default function Sidebar({ mobileOpen, onClose }) {
       )}
       <aside
         className={`
-          fixed top-0 left-0 z-30 h-screen w-60 bg-gray-100 border-r border-gray-200 flex flex-col
+          fixed top-0 left-0 z-30 h-screen w-60 bg-white border-r border-gray-200 flex flex-col
           transition-transform duration-300 ease-in-out
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto
         `}
@@ -213,14 +248,33 @@ export default function Sidebar({ mobileOpen, onClose }) {
           {NAV.map(({ group, items }) => (
             <div
               key={group ?? '_root'}
-              className={group === 'MARKETING' ? 'mt-3 pt-2 border-t border-gray-200' : ''}
+              className={
+                group === 'CORE'
+                  ? 'mt-2 bg-sky-50/60 border-y border-sky-100'
+                  : group === 'MARKETING'
+                    ? 'mt-3 bg-emerald-50/60 border-y border-emerald-100'
+                    : ''
+              }
             >
               {group && (
-                <p className="px-4 pt-4 pb-1 text-[9px] font-bold tracking-[0.12em] text-gray-400 uppercase">
-                  {group}
-                </p>
+                <button
+                  onClick={() => toggleSection(group)}
+                  className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between text-[9px] font-bold tracking-[0.12em] text-gray-400 uppercase hover:text-gray-600 transition"
+                >
+                  <span>{group}</span>
+                  <svg
+                    className={`w-3 h-3 transition-transform ${sectionOpen[group] ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
               )}
-              {items.map((item) =>
+              {(!group || sectionOpen[group]) && items
+                .filter((item) => (!item.adminOnly || user?.role === 'admin') && (roleModulePermissions[item.label] ?? true))
+                .map((item) =>
                 item.path ? (
                   <Link
                     key={item.label}
@@ -280,8 +334,67 @@ export default function Sidebar({ mobileOpen, onClose }) {
               )}
             </div>
           ))}
-          <div className="h-4" />
         </nav>
+
+        <div className="relative border-t border-gray-200 p-3 shrink-0 bg-white/70">
+          <button
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className="w-full flex items-center gap-2.5 px-1.5 py-2 rounded-lg hover:bg-gray-100 transition"
+          >
+            <div className="w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-xs font-semibold text-gray-800 truncate">{user?.name ?? 'Admin'}</p>
+              <p className="text-[11px] text-gray-500 capitalize truncate">{user?.role ?? 'admin'}</p>
+            </div>
+            <svg
+              className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {userMenuOpen && (
+            <div className="absolute left-full ml-2 bottom-3 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-40">
+              <Link
+                to="/profile"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  onClose?.()
+                }}
+                className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                Profile
+              </Link>
+
+              <div className="h-px bg-gray-200" />
+
+              <Link
+                to="/settings"
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  onClose?.()
+                }}
+                className="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                Settings
+              </Link>
+
+              <div className="h-px bg-gray-200" />
+
+              <button
+                onClick={handleLogout}
+                className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
     </>
   )

@@ -43,11 +43,6 @@ export default function LoginPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">PropVault</h1>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="w-2 h-2 rounded-full bg-primary-500"></span>
-              <p className="text-sm text-gray-500 font-medium">Admin Portal</p>
-              <span className="w-2 h-2 rounded-full bg-primary-500"></span>
-            </div>
           </div>
 
           {error && (
@@ -62,7 +57,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Admin Email
+                Work Email
               </label>
               <input
                 id="email"
@@ -71,7 +66,7 @@ export default function LoginPage() {
                 autoComplete="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="admin@example.com"
+                placeholder="name@company.com"
                 className="input-field"
               />
             </div>
@@ -86,7 +81,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={form.password}
                 onChange={handleChange}
-                placeholder="��������"
+                placeholder="Enter your password"
                 className="input-field"
               />
             </div>
@@ -95,12 +90,12 @@ export default function LoginPage() {
               disabled={loading}
               className="btn-primary w-full py-3 flex items-center justify-center gap-2"
             >
-              {loading ? 'Signing in...' : 'Sign in to Admin Panel'}
+              {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
         </div>
         <p className="text-center text-xs text-gray-400 mt-4">
-          Restricted to administrators only
+          Use your invited account credentials to continue
         </p>
       </div>
     </div>

@@ -109,7 +109,7 @@ export default function AddPropertyPage() {
             <span className="mx-1">/</span>
             <span className="text-gray-700">Add Property</span>
           </nav>
-          <h2 className="text-xl font-bold text-gray-900">Add New Property</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Add New Property</h2>
         </div>
       </div>
 

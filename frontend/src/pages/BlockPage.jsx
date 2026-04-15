@@ -74,7 +74,6 @@ export default function BlockPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Block {block}</h1>
-          <p className="text-sm text-gray-500">{project?.name} · {units.length} flat{units.length !== 1 ? 's' : ''}</p>
         </div>
         <Link
           to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}

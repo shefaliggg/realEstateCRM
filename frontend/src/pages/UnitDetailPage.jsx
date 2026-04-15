@@ -53,7 +53,6 @@ export default function UnitDetailPage() {
             <h1 className="text-2xl font-bold text-gray-900">
               Block {unit.block} – Unit {unit.unitNo}
             </h1>
-            <p className="text-sm text-gray-500">Floor {unit.floor} · {unit.bhkType}</p>
           </div>
           <span className={`text-sm font-medium px-3 py-1.5 rounded-full ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
             {unit.status}

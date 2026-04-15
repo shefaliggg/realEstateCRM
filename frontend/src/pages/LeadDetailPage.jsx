@@ -125,7 +125,6 @@ export default function LeadDetailPage() {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{lead.name}</h1>
-            <p className="text-sm text-gray-500">{lead.phone}{lead.email ? ` · ${lead.email}` : ''}</p>
           </div>
           <button onClick={handleDelete} className="text-xs text-red-400 hover:text-red-600 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">
             Delete Lead

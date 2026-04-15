@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 
@@ -6,11 +6,29 @@ export default function ProjectDetailPage() {
   const { id } = useParams()
   const [project, setProject] = useState(null)
   const [units, setUnits] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState('blocks')
+  const [tab, setTab] = useState('overview')
   const [newBlock, setNewBlock] = useState('')
   const [addingBlock, setAddingBlock] = useState(false)
+  const [selectedManagers, setSelectedManagers] = useState([])
+  const [assigningManager, setAssigningManager] = useState(false)
+  const [assignMessage, setAssignMessage] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [managerSearch, setManagerSearch] = useState('')
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    if (!dropdownOpen) return
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [dropdownOpen])
 
   useEffect(() => {
     Promise.all([
@@ -20,10 +38,20 @@ export default function ProjectDetailPage() {
       .then(([pRes, uRes]) => {
         setProject(pRes.data)
         setUnits(uRes.data)
+        const assignedIds = Array.isArray(pRes.data?.managedBy)
+          ? pRes.data.managedBy.map((u) => (typeof u === 'string' ? u : u._id)).filter(Boolean)
+          : []
+        setSelectedManagers(assignedIds)
       })
       .catch(() => setError('Failed to load project'))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    api.get('/users')
+      .then((res) => setUsers(res.data || []))
+      .catch(() => setUsers([]))
+  }, [])
 
   const blocks = project?.blocks || []
 
@@ -57,6 +85,73 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleAssignManager = async () => {
+    if (assigningManager) return
+    setAssigningManager(true)
+    setAssignMessage('')
+    try {
+      const payload = { managedBy: selectedManagers }
+      const res = await api.put(`/projects/${id}`, payload)
+      setProject((prev) => ({ ...prev, ...res.data }))
+      const assignedIds = Array.isArray(res.data?.managedBy)
+        ? res.data.managedBy.map((u) => (typeof u === 'string' ? u : u._id)).filter(Boolean)
+        : []
+      setSelectedManagers(assignedIds)
+      setAssignMessage(assignedIds.length ? 'Managers assigned successfully.' : 'Assignment cleared.')
+    } catch {
+      setAssignMessage('Failed to assign manager.')
+    } finally {
+      setAssigningManager(false)
+    }
+  }
+
+  const toggleManager = (userId) => {
+    setSelectedManagers((prev) => (
+      prev.includes(userId) ? prev.filter((idVal) => idVal !== userId) : [...prev, userId]
+    ))
+  }
+
+  const assignedUsers = Array.isArray(project?.managedBy) ? project.managedBy : []
+  const filteredUsers = users.filter((u) => {
+    const query = managerSearch.trim().toLowerCase()
+    if (!query) return true
+    return [u.name, u.email, u.phone, u.role].some((value) => value?.toLowerCase().includes(query))
+  })
+  const selectedUsers = users.filter((u) => selectedManagers.includes(u._id))
+  const displayAssignedUsers = selectedManagers
+    .map((userId) => users.find((u) => u._id === userId) || assignedUsers.find((u) => u?._id === userId))
+    .filter(Boolean)
+  const projectImages = Array.isArray(project?.images) ? project.images.filter(Boolean) : []
+  const projectVideos = Array.isArray(project?.videos) ? project.videos.filter(Boolean) : []
+  const galleryMedia = [
+    ...projectImages.map((src, index) => ({ id: `image-${index}`, src, type: 'image' })),
+    ...projectVideos.map((src, index) => ({ id: `video-${index}`, src, type: 'video' })),
+  ]
+  const locationParts = [
+    project.location?.address,
+    project.location?.locality,
+    project.location?.city,
+    project.location?.state,
+    project.location?.pincode,
+  ].filter(Boolean)
+  const locationText = locationParts.join(', ')
+  const googleMapLink = project.location?.googleMapLink || ''
+  const mapSrc = locationText
+    ? `https://www.google.com/maps?q=${encodeURIComponent(locationText)}&z=15&output=embed`
+    : ''
+  const mapActionLink = googleMapLink || (locationText ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationText)}` : '')
+  const formatDate = (value) => {
+    if (!value) return '—'
+    const parsed = new Date(value)
+    if (Number.isNaN(parsed.getTime())) return '—'
+    return parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+  const getInitials = (name) => (
+    name
+      ? name.split(' ').map((word) => word[0]).join('').slice(0, 2).toUpperCase()
+      : 'U'
+  )
+
   return (
           <div className="p-6">
         {/* Breadcrumb */}
@@ -70,21 +165,6 @@ export default function ProjectDetailPage() {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-            <p className="text-sm text-gray-500">{project.developerName} · {project.location?.city}</p>
-          </div>
-          <div className="flex gap-2">
-            <Link
-              to={`/projects/${id}/units/add`}
-              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              + Add Unit
-            </Link>
-            <Link
-              to={`/projects/edit/${id}`}
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              Edit
-            </Link>
           </div>
         </div>
 
@@ -105,15 +185,19 @@ export default function ProjectDetailPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 mb-5">
-          {['blocks', 'overview'].map(t => (
+          {[
+            { key: 'overview', label: 'Overview' },
+            { key: 'blocks', label: 'Blocks' },
+            { key: 'managedBy', label: 'Managed By' },
+          ].map(({ key, label }) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium capitalize border-b-2 -mb-px transition-colors ${
-                tab === t ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              key={key}
+              onClick={() => setTab(key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t}
+              {label}
             </button>
           ))}
         </div>
@@ -178,31 +262,79 @@ export default function ProjectDetailPage() {
                     </Link>
                   )
                 })}
-                {/* Quick-add tile */}
-                <Link
-                  to={`/projects/${id}/units/add`}
-                  className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center gap-2 hover:border-primary-300 hover:bg-primary-50/30 transition-all min-h-[120px]"
-                >
-                  <span className="text-2xl text-gray-300">+</span>
-                  <span className="text-sm font-medium text-gray-400">Add Flat</span>
-                </Link>
               </div>
             )}
           </div>
         )}
 
         {tab === 'overview' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="font-semibold text-gray-800">Project Gallery</h3>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  {galleryMedia.length} media
+                </span>
+              </div>
+
+              {galleryMedia.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {galleryMedia.map((media, index) => (
+                    <div key={media.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-slate-50">
+                      {media.type === 'image' ? (
+                        <img
+                          src={media.src}
+                          alt={`${project.name} ${index + 1}`}
+                          className="h-56 w-full object-cover"
+                        />
+                      ) : (
+                        <video
+                          src={media.src}
+                          controls
+                          preload="metadata"
+                          className="h-56 w-full bg-black object-cover"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50 px-4 py-12 text-center text-sm text-gray-500">
+                  No project media added yet.
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <h3 className="font-semibold text-gray-800 mb-3">📋 Project Details</h3>
               <dl className="space-y-2 text-sm">
+                <div className="flex justify-between"><dt className="text-gray-500">Developer</dt><dd className="font-medium text-right">{project.developerName || '—'}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Type</dt><dd className="font-medium">{project.type}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Status</dt><dd className="font-medium">{project.status}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">RERA No.</dt><dd className="font-medium">{project.reraNo || '—'}</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">Location</dt><dd className="font-medium">{[project.location?.locality, project.location?.city].filter(Boolean).join(', ') || '—'}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Location</dt><dd className="font-medium text-right">{locationText || '—'}</dd></div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-gray-500">Map Link</dt>
+                  <dd className="font-medium text-right break-all">
+                    {googleMapLink ? (
+                      <a href={googleMapLink} target="_blank" rel="noreferrer" className="text-primary-600 hover:text-primary-700">
+                        Open Link
+                      </a>
+                    ) : '—'}
+                  </dd>
+                </div>
+                <div className="flex justify-between"><dt className="text-gray-500">Launch Date</dt><dd className="font-medium">{formatDate(project.launchDate)}</dd></div>
+                <div className="flex justify-between"><dt className="text-gray-500">Possession Date</dt><dd className="font-medium">{formatDate(project.possessionDate)}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Total Units</dt><dd className="font-medium">{project.totalUnits}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Blocks</dt><dd className="font-medium">{project.blocks?.join(', ') || '—'}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">BHK Types</dt><dd className="font-medium">{project.bhkTypes?.join(', ') || '—'}</dd></div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Managed By</dt>
+                  <dd className="font-medium text-right">
+                    {assignedUsers.length ? assignedUsers.map((u) => u.name).join(', ') : 'Unassigned'}
+                  </dd>
+                </div>
               </dl>
             </div>
             {project.amenities?.length > 0 && (
@@ -215,12 +347,222 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             )}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:col-span-2">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="font-semibold text-gray-800">📍 Map</h3>
+                {mapActionLink && (
+                  <a
+                    href={mapActionLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                  >
+                    Open in Google Maps
+                  </a>
+                )}
+              </div>
+
+              {mapSrc ? (
+                <div className="overflow-hidden rounded-2xl border border-gray-200">
+                  <iframe
+                    title={`${project.name} map`}
+                    src={mapSrc}
+                    className="h-80 w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50 px-4 py-10 text-center text-sm text-gray-500">
+                  Add project address details to show the map.
+                </div>
+              )}
+            </div>
             {project.description && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:col-span-2">
                 <h3 className="font-semibold text-gray-800 mb-2">📝 Description</h3>
                 <p className="text-sm text-gray-600 whitespace-pre-line">{project.description}</p>
               </div>
             )}
+            </div>
+          </div>
+        )}
+
+        {tab === 'managedBy' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+              <div className="border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Assign Team Members</h3>
+                    <p className="mt-1 text-sm text-gray-500">Pick one or more members to manage this project.</p>
+                  </div>
+                  <div className="flex items-center gap-2 self-start rounded-full bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700">
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary-500" />
+                    {selectedManagers.length} selected
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {users.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="relative" ref={dropdownRef}>
+                      <button
+                        type="button"
+                        onClick={() => setDropdownOpen((prev) => !prev)}
+                        className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-primary-300 hover:shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Team Picker</p>
+                            <p className="mt-1 truncate text-sm font-medium text-gray-800">
+                              {selectedUsers.length === 0
+                                ? 'Select team members'
+                                : selectedUsers.map((u) => u.name).join(', ')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                              {selectedUsers.length}
+                            </span>
+                            <svg
+                              className={`h-4 w-4 text-gray-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m6 9 6 6 6-6" />
+                            </svg>
+                          </div>
+                        </div>
+                      </button>
+
+                      {dropdownOpen && (
+                        <div className="absolute left-0 top-full z-10 mt-3 w-full rounded-2xl border border-gray-200 bg-white shadow-xl shadow-gray-200/60">
+                          <div className="border-b border-gray-100 p-3">
+                            <input
+                              value={managerSearch}
+                              onChange={(e) => setManagerSearch(e.target.value)}
+                              placeholder="Search by name, email, phone or role"
+                              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
+                            />
+                          </div>
+
+                          <div className="max-h-72 overflow-y-auto p-3">
+                            {filteredUsers.length === 0 ? (
+                              <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                                No team members match this search.
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {filteredUsers.map((u) => {
+                                  const checked = selectedManagers.includes(u._id)
+                                  return (
+                                    <label
+                                      key={u._id}
+                                      className={`flex items-center gap-3 rounded-xl border px-3 py-3 cursor-pointer transition ${
+                                        checked
+                                          ? 'border-primary-300 bg-primary-50/70'
+                                          : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleManager(u._id)}
+                                        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                      />
+                                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                                        {getInitials(u.name)}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <p className="truncate text-sm font-semibold text-gray-900">{u.name}</p>
+                                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                                            {u.role}
+                                          </span>
+                                        </div>
+                                        <p className="truncate text-xs text-gray-500">{u.email || 'No email available'}</p>
+                                      </div>
+                                    </label>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleAssignManager}
+                        disabled={assigningManager}
+                        className="inline-flex items-center justify-center rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-700 disabled:opacity-50"
+                      >
+                        {assigningManager ? 'Saving...' : 'Save Assignment'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">No users available to assign, or you may not have permission to fetch users.</p>
+                )}
+
+                {assignMessage && (
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                    {assignMessage}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="font-semibold text-gray-800">Assigned Members</h3>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  {displayAssignedUsers.length} total
+                </span>
+              </div>
+
+              {displayAssignedUsers.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
+                  No users assigned yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {displayAssignedUsers.map((u) => {
+                    return (
+                      <div key={u._id} className="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-slate-50 p-4">
+                        <div className="flex items-start gap-3">
+                        {u.image ? (
+                          <img src={u.image} alt={u.name} className="w-11 h-11 rounded-full object-cover border border-gray-200" />
+                        ) : (
+                          <div className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold border border-primary-200">
+                            {getInitials(u.name)}
+                          </div>
+                        )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                {u.role || 'User'}
+                              </span>
+                            </div>
+                            <div className="mt-3 space-y-1.5 text-xs text-gray-500">
+                              <p className="truncate">{u.email || 'No email'}</p>
+                              <p className="truncate">{u.phone || 'No phone'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
