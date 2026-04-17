@@ -2,6 +2,54 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 
+const PROFILE_TYPE_CONFIG = {
+  Apartments: {
+    showBlocksTab: true,
+    showBlocksDetails: true,
+    showBhkDetails: true,
+    totalLabel: 'Total Units',
+    blockUnitLabel: 'flats',
+    amenitiesTitle: 'Amenities',
+    descriptionTitle: 'Description',
+  },
+  Villas: {
+    showBlocksTab: true,
+    showBlocksDetails: true,
+    showBhkDetails: true,
+    totalLabel: 'Total Villas',
+    blockUnitLabel: 'villas',
+    amenitiesTitle: 'Amenities',
+    descriptionTitle: 'Description',
+  },
+  Plots: {
+    showBlocksTab: false,
+    showBlocksDetails: false,
+    showBhkDetails: false,
+    totalLabel: 'Total Plots',
+    blockUnitLabel: 'plots',
+    amenitiesTitle: 'Layout Amenities',
+    descriptionTitle: 'Layout Description',
+  },
+  Commercial: {
+    showBlocksTab: false,
+    showBlocksDetails: false,
+    showBhkDetails: false,
+    totalLabel: 'Total Spaces',
+    blockUnitLabel: 'spaces',
+    amenitiesTitle: 'Commercial Amenities',
+    descriptionTitle: 'Commercial Description',
+  },
+  'Mixed Use': {
+    showBlocksTab: true,
+    showBlocksDetails: true,
+    showBhkDetails: true,
+    totalLabel: 'Total Units/Spaces',
+    blockUnitLabel: 'units',
+    amenitiesTitle: 'Amenities',
+    descriptionTitle: 'Project Description',
+  },
+}
+
 export default function ProjectDetailPage() {
   const { id } = useParams()
   const [project, setProject] = useState(null)
@@ -18,6 +66,8 @@ export default function ProjectDetailPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [managerSearch, setManagerSearch] = useState('')
   const dropdownRef = useRef(null)
+  const projectType = project?.type || 'Apartments'
+  const profileTypeConfig = PROFILE_TYPE_CONFIG[projectType] || PROFILE_TYPE_CONFIG.Apartments
 
   useEffect(() => {
     if (!dropdownOpen) return
@@ -52,6 +102,12 @@ export default function ProjectDetailPage() {
       .then((res) => setUsers(res.data || []))
       .catch(() => setUsers([]))
   }, [])
+
+  useEffect(() => {
+    if ((tab === 'blocks' && !profileTypeConfig.showBlocksTab) || (tab === 'plots' && projectType !== 'Plots')) {
+      setTab('overview')
+    }
+  }, [tab, profileTypeConfig.showBlocksTab, projectType])
 
   const blocks = project?.blocks || []
 
@@ -152,6 +208,13 @@ export default function ProjectDetailPage() {
       : 'U'
   )
 
+  const tabs = [
+    { key: 'overview', label: 'Overview' },
+    ...(profileTypeConfig.showBlocksTab ? [{ key: 'blocks', label: 'Blocks' }] : []),
+    ...(projectType === 'Plots' ? [{ key: 'plots', label: 'Plots' }] : []),
+    { key: 'managedBy', label: 'Managed By' },
+  ]
+
   return (
           <div className="p-6">
         {/* Breadcrumb */}
@@ -166,6 +229,14 @@ export default function ProjectDetailPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
           </div>
+          {projectType === 'Plots' && (
+            <Link
+              to={`/projects/${id}/units/add`}
+              className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              + Add Plot
+            </Link>
+          )}
         </div>
 
         {/* Stats chips */}
@@ -185,11 +256,7 @@ export default function ProjectDetailPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 mb-5">
-          {[
-            { key: 'overview', label: 'Overview' },
-            { key: 'blocks', label: 'Blocks' },
-            { key: 'managedBy', label: 'Managed By' },
-          ].map(({ key, label }) => (
+          {tabs.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -247,7 +314,7 @@ export default function ProjectDetailPage() {
                         <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
                           <span className="text-primary-700 font-bold text-xs">Blk {b}</span>
                         </div>
-                        <span className="text-xs text-gray-400">{bu.length} flats</span>
+                        <span className="text-xs text-gray-400">{bu.length} {profileTypeConfig.blockUnitLabel}</span>
                       </div>
                       <div className="flex h-1.5 rounded-full overflow-hidden mb-3">
                         <div className="bg-green-400" style={{ width: `${(bAvail / bTotal) * 100}%` }} />
@@ -262,6 +329,68 @@ export default function ProjectDetailPage() {
                     </Link>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'plots' && projectType === 'Plots' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div>
+                <h3 className="font-semibold text-gray-800">📍 Plot Inventory</h3>
+                <p className="text-sm text-gray-500">Manage all plots created under this land project.</p>
+              </div>
+              <Link
+                to={`/projects/${id}/units/add`}
+                className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                + Add Plot
+              </Link>
+            </div>
+
+            {units.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-10 text-center text-sm text-gray-500">
+                No plots added yet.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {units.map((plot) => (
+                  <Link
+                    key={plot._id}
+                    to={`/units/${plot._id}`}
+                    className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-primary-200 hover:shadow"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-gray-400">Plot No.</p>
+                        <h4 className="mt-1 text-base font-semibold text-gray-900">{plot.unitNo || '—'}</h4>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                        {plot.status || 'Available'}
+                      </span>
+                    </div>
+
+                    <dl className="mt-4 space-y-2 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Facing</dt>
+                        <dd className="font-medium text-gray-800">{plot.facing || '—'}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Plot Area</dt>
+                        <dd className="font-medium text-gray-800">
+                          {plot.carpetArea ? `${plot.carpetArea} sqyd` : '—'}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Base Price</dt>
+                        <dd className="font-medium text-gray-800">
+                          {plot.basePrice ? `₹${plot.basePrice.toLocaleString('en-IN')}` : '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </Link>
+                ))}
               </div>
             )}
           </div>
@@ -326,9 +455,15 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="flex justify-between"><dt className="text-gray-500">Launch Date</dt><dd className="font-medium">{formatDate(project.launchDate)}</dd></div>
                 <div className="flex justify-between"><dt className="text-gray-500">Possession Date</dt><dd className="font-medium">{formatDate(project.possessionDate)}</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">Total Units</dt><dd className="font-medium">{project.totalUnits}</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">Blocks</dt><dd className="font-medium">{project.blocks?.join(', ') || '—'}</dd></div>
-                <div className="flex justify-between"><dt className="text-gray-500">BHK Types</dt><dd className="font-medium">{project.bhkTypes?.join(', ') || '—'}</dd></div>
+                {project.totalUnits ? (
+                  <div className="flex justify-between"><dt className="text-gray-500">{profileTypeConfig.totalLabel}</dt><dd className="font-medium">{project.totalUnits}</dd></div>
+                ) : null}
+                {profileTypeConfig.showBlocksDetails ? (
+                  <div className="flex justify-between"><dt className="text-gray-500">Blocks</dt><dd className="font-medium">{project.blocks?.join(', ') || '—'}</dd></div>
+                ) : null}
+                {profileTypeConfig.showBhkDetails ? (
+                  <div className="flex justify-between"><dt className="text-gray-500">BHK Types</dt><dd className="font-medium">{project.bhkTypes?.join(', ') || '—'}</dd></div>
+                ) : null}
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Managed By</dt>
                   <dd className="font-medium text-right">
@@ -339,7 +474,7 @@ export default function ProjectDetailPage() {
             </div>
             {project.amenities?.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                <h3 className="font-semibold text-gray-800 mb-3">🏊 Amenities</h3>
+                <h3 className="font-semibold text-gray-800 mb-3">🏊 {profileTypeConfig.amenitiesTitle}</h3>
                 <div className="flex flex-wrap gap-2">
                   {project.amenities.map(a => (
                     <span key={a} className="bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full">{a}</span>
@@ -380,7 +515,7 @@ export default function ProjectDetailPage() {
             </div>
             {project.description && (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 md:col-span-2">
-                <h3 className="font-semibold text-gray-800 mb-2">📝 Description</h3>
+                <h3 className="font-semibold text-gray-800 mb-2">📝 {profileTypeConfig.descriptionTitle}</h3>
                 <p className="text-sm text-gray-600 whitespace-pre-line">{project.description}</p>
               </div>
             )}

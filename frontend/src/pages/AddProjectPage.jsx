@@ -4,16 +4,74 @@ import api from '../api/axios'
 
 const BLOCK_PRESETS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
+const PROJECT_TYPES = ['Apartments', 'Villas', 'Plots', 'Commercial', 'Mixed Use']
+const TYPE_FIELD_CONFIG = {
+  Apartments: {
+    showBlocks: true,
+    showBhkTypes: true,
+    showTimeline: true,
+    requireBlocks: true,
+    requireBhkTypes: true,
+    amenitiesLabel: 'Amenities',
+    amenitiesPlaceholder: 'Swimming Pool, Gym, Club House, Kids Play Area',
+    descriptionLabel: 'Description',
+    descriptionPlaceholder: 'Brief description of the apartment project...',
+  },
+  Villas: {
+    showBlocks: true,
+    showBhkTypes: true,
+    showTimeline: true,
+    requireBlocks: true,
+    requireBhkTypes: true,
+    amenitiesLabel: 'Amenities',
+    amenitiesPlaceholder: 'Clubhouse, Private Garden, Security, Jogging Track',
+    descriptionLabel: 'Description',
+    descriptionPlaceholder: 'Brief description of the villa project...',
+  },
+  Plots: {
+    showBlocks: false,
+    showBhkTypes: false,
+    showTimeline: true,
+    requireBlocks: false,
+    requireBhkTypes: false,
+    amenitiesLabel: 'Layout Amenities',
+    amenitiesPlaceholder: 'Parks, Clubhouse Plot, Internal Roads, Water Line',
+    descriptionLabel: 'Layout Description',
+    descriptionPlaceholder: 'Describe layout plan, road widths, approvals, and nearby landmarks...',
+  },
+  Commercial: {
+    showBlocks: false,
+    showBhkTypes: false,
+    showTimeline: true,
+    requireBlocks: false,
+    requireBhkTypes: false,
+    amenitiesLabel: 'Commercial Amenities',
+    amenitiesPlaceholder: 'High-speed Lifts, Parking, Food Court, Power Backup',
+    descriptionLabel: 'Commercial Description',
+    descriptionPlaceholder: 'Brief description of office/retail mix and key business advantages...',
+  },
+  'Mixed Use': {
+    showBlocks: true,
+    showBhkTypes: true,
+    showTimeline: true,
+    requireBlocks: true,
+    requireBhkTypes: false,
+    amenitiesLabel: 'Amenities',
+    amenitiesPlaceholder: 'Gym, Retail Arcade, Club House, Visitor Parking',
+    descriptionLabel: 'Project Description',
+    descriptionPlaceholder: 'Brief description of residential and commercial components...',
+  },
+}
 
 export default function AddProjectPage() {
   const navigate = useNavigate()
+  const [currentStep, setCurrentStep] = useState(1)
   const [form, setForm] = useState({
     name: '',
     developerName: '',
     type: 'Apartments',
     status: 'Under Construction',
     reraNo: '',
-    totalUnits: '',
     address: '',
     locality: '',
     city: '',
@@ -30,7 +88,6 @@ export default function AddProjectPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [newBlock, setNewBlock] = useState('')
-  const [newBhkType, setNewBhkType] = useState('')
   const [imageFiles, setImageFiles] = useState([])
   const [videoFiles, setVideoFiles] = useState([])
   const imageFilesRef = useRef([])
@@ -77,32 +134,35 @@ export default function AddProjectPage() {
     }))
   }
 
-  const addCustomBhkType = () => {
-    const value = newBhkType.trim()
-    if (!value) return
-    setForm((prev) => {
-      const exists = prev.bhkTypes.some((type) => type.toLowerCase() === value.toLowerCase())
-      if (exists) return prev
-      return { ...prev, bhkTypes: [...prev.bhkTypes, value] }
-    })
-    setNewBhkType('')
-  }
-
-  const handleImageChange = (e) => {
+  const handleMediaChange = (e) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    setImageFiles((prev) => {
-      const next = [...prev]
-      files.forEach((file) => {
-        next.push({
-          id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-          file,
-          preview: URL.createObjectURL(file),
-        })
-      })
-      return next
+    const nextImages = []
+    const nextVideos = []
+
+    files.forEach((file) => {
+      const media = {
+        id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        preview: URL.createObjectURL(file),
+      }
+
+      if (file.type.startsWith('image/')) {
+        nextImages.push(media)
+      } else if (file.type.startsWith('video/')) {
+        nextVideos.push(media)
+      } else {
+        URL.revokeObjectURL(media.preview)
+      }
     })
+
+    if (nextImages.length > 0) {
+      setImageFiles((prev) => [...prev, ...nextImages])
+    }
+    if (nextVideos.length > 0) {
+      setVideoFiles((prev) => [...prev, ...nextVideos])
+    }
 
     e.target.value = ''
   }
@@ -117,25 +177,6 @@ export default function AddProjectPage() {
     })
   }
 
-  const handleVideoChange = (e) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    setVideoFiles((prev) => {
-      const next = [...prev]
-      files.forEach((file) => {
-        next.push({
-          id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-          file,
-          preview: URL.createObjectURL(file),
-        })
-      })
-      return next
-    })
-
-    e.target.value = ''
-  }
-
   const removeVideo = (videoId) => {
     setVideoFiles((prev) => {
       const videoToRemove = prev.find((video) => video.id === videoId)
@@ -146,15 +187,37 @@ export default function AddProjectPage() {
     })
   }
 
+  const typeConfig = TYPE_FIELD_CONFIG[form.type] || TYPE_FIELD_CONFIG.Apartments
+  const showBlocks = typeConfig.showBlocks
+  const showBhkTypes = typeConfig.showBhkTypes
+  const showTimeline = typeConfig.showTimeline
+
+  const handleNextStep = () => {
+    setError('')
+    if (!form.type) {
+      setError('Please select a project type to continue')
+      return
+    }
+    setCurrentStep(2)
+  }
+
   const handleSubmit = async e => {
     e.preventDefault()
     setError('')
+    if (currentStep !== 2) {
+      setError('Please complete Step 1 first')
+      return
+    }
     if (!form.name || !form.developerName) {
       setError('Project name and developer name are required')
       return
     }
-    if (form.blocks.length === 0) {
+    if (typeConfig.requireBlocks && form.blocks.length === 0) {
       setError('Add at least one block')
+      return
+    }
+    if (typeConfig.requireBhkTypes && form.bhkTypes.length === 0) {
+      setError('Select at least one BHK type')
       return
     }
     setLoading(true)
@@ -165,7 +228,6 @@ export default function AddProjectPage() {
       formData.append('type', form.type)
       formData.append('status', form.status)
       formData.append('reraNo', form.reraNo)
-      formData.append('totalUnits', form.totalUnits)
       formData.append('address', form.address)
       formData.append('locality', form.locality)
       formData.append('city', form.city)
@@ -216,19 +278,70 @@ export default function AddProjectPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold ${currentStep === 1 ? 'bg-primary-600 text-white' : 'bg-primary-100 text-primary-700'}`}>1</span>
+                <span className="font-medium text-gray-700">Project Type</span>
+              </div>
+              <div className="h-px flex-1 mx-4 bg-gray-200" />
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold ${currentStep === 2 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>2</span>
+                <span className="font-medium text-gray-700">Project Details</span>
+              </div>
+            </div>
+          </div>
+
+          {currentStep === 1 && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+              <h2 className="font-semibold text-gray-800">Step 1: Select Project Type</h2>
+              <p className="text-sm text-gray-500">Step 2 fields will be shown based on the type you select here.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {PROJECT_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setForm((prev) => ({ ...prev, type }))}
+                    className={`rounded-lg border px-4 py-3 text-left text-sm font-medium transition-colors ${
+                      form.type === type
+                        ? 'border-primary-600 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleNextStep}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Continue to Step 2
+                </button>
+                <Link to="/projects" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+                  Cancel
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <>
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="font-semibold text-gray-800 mb-4">🖼 Project Images</h2>
+            <h2 className="font-semibold text-gray-800 mb-4">🖼 Project Media</h2>
             <div>
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:border-primary-300 hover:bg-primary-50/40 transition-colors">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   multiple
-                  onChange={handleImageChange}
+                  onChange={handleMediaChange}
                   className="hidden"
                 />
-                <span className="text-sm font-medium text-gray-700">Upload Images</span>
-                <span className="text-xs text-gray-500">PNG, JPG, WEBP</span>
+                <span className="text-sm font-medium text-gray-700">Upload Media</span>
+                <span className="text-xs text-gray-500">Images + Videos</span>
               </label>
 
               {imageFiles.length > 0 && (
@@ -252,44 +365,42 @@ export default function AddProjectPage() {
               )}
             </div>
 
-            <div className="mt-4">
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left hover:border-primary-300 hover:bg-primary-50/40 transition-colors">
-                <input
-                  type="file"
-                  accept="video/*"
-                  multiple
-                  onChange={handleVideoChange}
-                  className="hidden"
-                />
-                <span className="text-sm font-medium text-gray-700">Upload Videos</span>
-                <span className="text-xs text-gray-500">MP4, MOV, WEBM</span>
-              </label>
-
-              {videoFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {videoFiles.map((video) => (
-                    <div key={video.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm text-gray-700">{video.file.name}</p>
-                        <p className="text-xs text-gray-500">{Math.round(video.file.size / 1024 / 1024)} MB</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeVideo(video.id)}
-                        className="text-xs font-medium text-red-500 hover:text-red-600"
-                      >
-                        Remove
-                      </button>
+            {videoFiles.length > 0 && (
+              <div className="mt-4 space-y-2">
+                {videoFiles.map((video) => (
+                  <div key={video.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-gray-700">{video.file.name}</p>
+                      <p className="text-xs text-gray-500">{Math.round(video.file.size / 1024 / 1024)} MB</p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVideo(video.id)}
+                      className="text-xs font-medium text-red-500 hover:text-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Basic Info */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 className="font-semibold text-gray-800 mb-4">📋 Basic Information</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-gray-800">📋 Basic Information</h2>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">Type: {form.type}</span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className="text-xs font-medium text-primary-600 hover:text-primary-700"
+                >
+                  Change Type
+                </button>
+              </div>
+            </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Project Name *</label>
@@ -304,13 +415,6 @@ export default function AddProjectPage() {
                   placeholder="VMR Developers" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <select name="type" value={form.type} onChange={handleChange}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-                  {['Apartments', 'Villas', 'Plots', 'Commercial', 'Mixed Use'].map(t => <option key={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select name="status" value={form.status} onChange={handleChange}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
@@ -322,12 +426,6 @@ export default function AddProjectPage() {
                 <input name="reraNo" value={form.reraNo} onChange={handleChange}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
                   placeholder="P02400001234" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Units</label>
-                <input name="totalUnits" value={form.totalUnits} onChange={handleChange} type="number" min="1"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                  placeholder="632" />
               </div>
             </div>
           </div>
@@ -376,6 +474,7 @@ export default function AddProjectPage() {
           </div>
 
           {/* Blocks */}
+          {showBlocks && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">🏢 Blocks</h2>
             <div className="flex flex-wrap gap-2 mb-3">
@@ -424,8 +523,10 @@ export default function AddProjectPage() {
               ))}
             </div>
           </div>
+          )}
 
           {/* BHK Types */}
+          {showBhkTypes && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">🛏 BHK Types</h2>
             <div className="flex flex-wrap gap-2">
@@ -440,24 +541,11 @@ export default function AddProjectPage() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 flex gap-2">
-              <input
-                value={newBhkType}
-                onChange={(e) => setNewBhkType(e.target.value)}
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                placeholder="Add custom flat type (e.g. 6 BHK, Villa Suite)"
-              />
-              <button
-                type="button"
-                onClick={addCustomBhkType}
-                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Add
-              </button>
-            </div>
           </div>
+          )}
 
           {/* Dates */}
+          {showTimeline && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">📅 Timeline</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -473,28 +561,36 @@ export default function AddProjectPage() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Amenities & Description */}
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">🏊 Amenities & Description</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amenities <span className="text-gray-400">(comma-separated)</span></label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{typeConfig.amenitiesLabel} <span className="text-gray-400">(comma-separated)</span></label>
                 <input name="amenities" value={form.amenities} onChange={handleChange}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                  placeholder="Swimming Pool, Gym, Club House, Kids Play Area" />
+                  placeholder={typeConfig.amenitiesPlaceholder} />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{typeConfig.descriptionLabel}</label>
                 <textarea name="description" value={form.description} onChange={handleChange} rows={3}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300 resize-none"
-                  placeholder="Brief description of the project..." />
+                  placeholder={typeConfig.descriptionPlaceholder} />
               </div>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Back
+            </button>
             <button type="submit" disabled={loading}
               className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
               {loading ? 'Creating...' : 'Create Project'}
@@ -503,6 +599,8 @@ export default function AddProjectPage() {
               Cancel
             </Link>
           </div>
+          </>
+          )}
         </form>
       </div>
       )

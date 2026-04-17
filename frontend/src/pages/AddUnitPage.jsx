@@ -21,11 +21,16 @@ export default function AddUnitPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const isPlotProject = project?.type === 'Plots'
 
   useEffect(() => {
     api.get(`/projects/${projectId}`)
       .then(r => {
         setProject(r.data)
+        if (r.data.type === 'Plots') {
+          setForm((f) => ({ ...f, block: 'PLOT', floor: '0', bhkType: 'Plot' }))
+          return
+        }
         if (!blockFromUrl && r.data.blocks?.length > 0) setForm(f => ({ ...f, block: r.data.blocks[0] }))
         if (r.data.bhkTypes?.length > 0) setForm(f => ({ ...f, bhkType: r.data.bhkTypes[0] }))
       })
@@ -40,18 +45,36 @@ export default function AddUnitPage() {
   const handleSubmit = async e => {
     e.preventDefault()
     setError('')
-    if (!form.block || !form.floor || !form.unitNo) {
+    if (isPlotProject && !form.unitNo) {
+      setError('Plot number is required')
+      return
+    }
+    if (!isPlotProject && (!form.block || !form.floor || !form.unitNo)) {
       setError('Block, floor and unit number are required')
       return
     }
     setLoading(true)
     try {
+      const payload = isPlotProject
+        ? {
+          ...form,
+          block: form.block || 'PLOT',
+          floor: 0,
+          bhkType: form.bhkType || 'Plot',
+          unitNo: form.unitNo,
+          carpetArea: form.carpetArea ? Number(form.carpetArea) : undefined,
+          basePrice: form.basePrice ? Number(form.basePrice) : undefined,
+        }
+        : {
+          ...form,
+          floor: Number(form.floor),
+          unitNo: form.unitNo,
+          carpetArea: form.carpetArea ? Number(form.carpetArea) : undefined,
+          basePrice: form.basePrice ? Number(form.basePrice) : undefined,
+        }
+
       await api.post(`/projects/${projectId}/units`, {
-        ...form,
-        floor: Number(form.floor),
-        unitNo: form.unitNo,
-        carpetArea: form.carpetArea ? Number(form.carpetArea) : undefined,
-        basePrice: form.basePrice ? Number(form.basePrice) : undefined,
+        ...payload,
       })
       navigate(blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`)
     } catch (err) {
@@ -79,10 +102,12 @@ export default function AddUnitPage() {
             </>
           )}
           <span>/</span>
-          <span className="text-gray-900 font-medium">Add Flat</span>
+          <span className="text-gray-900 font-medium">{isPlotProject ? 'Add Plot' : 'Add Flat'}</span>
         </div>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">🏠 Add Flat{blockFromUrl ? ` — Block ${blockFromUrl}` : ''}</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          {isPlotProject ? '📍 Add Plot' : `🏠 Add Flat${blockFromUrl ? ` — Block ${blockFromUrl}` : ''}`}
+        </h1>
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>
@@ -92,54 +117,60 @@ export default function AddUnitPage() {
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 className="font-semibold text-gray-800 mb-4">📐 Unit Details</h2>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Block *</label>
-                {blockFromUrl ? (
-                  <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
-                    Block {blockFromUrl}
+              {!isPlotProject && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Block *</label>
+                    {blockFromUrl ? (
+                      <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700">
+                        Block {blockFromUrl}
+                      </div>
+                    ) : project?.blocks?.length > 0 ? (
+                      <select name="block" value={form.block} onChange={handleChange}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+                        {project.blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
+                      </select>
+                    ) : (
+                      <input name="block" value={form.block} onChange={handleChange} required
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                        placeholder="A" />
+                    )}
                   </div>
-                ) : project?.blocks?.length > 0 ? (
-                  <select name="block" value={form.block} onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-                    {project.blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
-                  </select>
-                ) : (
-                  <input name="block" value={form.block} onChange={handleChange} required
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                    placeholder="A" />
-                )}
-              </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Floor *</label>
+                    <input name="floor" value={form.floor} onChange={handleChange} type="number" min="0" required
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                      placeholder="3" />
+                  </div>
+                </>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Floor *</label>
-                <input name="floor" value={form.floor} onChange={handleChange} type="number" min="0" required
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                  placeholder="3" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Unit No. *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{isPlotProject ? 'Plot No. *' : 'Unit No. *'}</label>
                 <input name="unitNo" value={form.unitNo} onChange={handleChange} required
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                  placeholder="301" />
+                  placeholder={isPlotProject ? 'P-101' : '301'} />
               </div>
+              {!isPlotProject && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">BHK Type</label>
+                  {project?.bhkTypes?.length > 0 ? (
+                    <select name="bhkType" value={form.bhkType} onChange={handleChange}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+                      {project.bhkTypes.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  ) : (
+                    <select name="bhkType" value={form.bhkType} onChange={handleChange}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
+                      {['2 BHK', '2.5 BHK', '3 BHK'].map(b => <option key={b}>{b}</option>)}
+                    </select>
+                  )}
+                </div>
+              )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">BHK Type</label>
-                {project?.bhkTypes?.length > 0 ? (
-                  <select name="bhkType" value={form.bhkType} onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-                    {project.bhkTypes.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                ) : (
-                  <select name="bhkType" value={form.bhkType} onChange={handleChange}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300">
-                    {['2 BHK', '2.5 BHK', '3 BHK'].map(b => <option key={b}>{b}</option>)}
-                  </select>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Carpet Area (sqft)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{isPlotProject ? 'Plot Area (sqyd)' : 'Carpet Area (sqft)'}</label>
                 <input name="carpetArea" value={form.carpetArea} onChange={handleChange} type="number" min="0"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                  placeholder="1250" />
+                  placeholder={isPlotProject ? '240' : '1250'} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Base Price (₹)</label>
@@ -161,7 +192,7 @@ export default function AddUnitPage() {
           <div className="flex gap-3">
             <button type="submit" disabled={loading}
               className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-              {loading ? 'Adding...' : 'Add Unit'}
+              {loading ? 'Adding...' : isPlotProject ? 'Add Plot' : 'Add Unit'}
             </button>
             <Link to={blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`}
               className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
