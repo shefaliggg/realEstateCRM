@@ -23,6 +23,12 @@ import AddDealPage from './pages/AddDealPage'
 import DealDetailPage from './pages/DealDetailPage'
 import DealPipelinePage from './pages/DealPipelinePage'
 import MyDealsPage from './pages/MyDealsPage'
+import SiteVisitSchedulePage from './pages/SiteVisitSchedulePage'
+import SiteVisitCalendarPage from './pages/SiteVisitCalendarPage'
+import ChannelPartnersPage from './pages/ChannelPartnersPage'
+import PartnerLeadsPage from './pages/PartnerLeadsPage'
+import PartnerPayoutsPage from './pages/PartnerPayoutsPage'
+import PartnerProfilePage from './pages/PartnerProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import PermissionsPage from './pages/PermissionsPage'
@@ -64,6 +70,16 @@ export default function App() {
           <Route path="/deals/mine" element={<PR><MyDealsPage /></PR>} />
           <Route path="/deals/pipeline" element={<PR><DealPipelinePage /></PR>} />
           <Route path="/deals/:id" element={<PR><DealDetailPage /></PR>} />
+
+          {/* Site Visits */}
+          <Route path="/visits/schedule" element={<PR><SiteVisitSchedulePage /></PR>} />
+          <Route path="/visits/calendar" element={<PR><SiteVisitCalendarPage /></PR>} />
+
+          {/* Channel Partners */}
+          <Route path="/partners" element={<PR><ChannelPartnersPage /></PR>} />
+          <Route path="/partners/:id" element={<PR><PartnerProfilePage /></PR>} />
+          <Route path="/partners/leads" element={<PR><PartnerLeadsPage /></PR>} />
+          <Route path="/partners/payouts" element={<PR><PartnerPayoutsPage /></PR>} />
 
           {/* Users and Roles */}
           <Route path="/users" element={<PR allowedRoles={['admin']}><UsersRolesPage /></PR>} />

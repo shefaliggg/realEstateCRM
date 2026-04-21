@@ -65,12 +65,6 @@ export default function AllLeadsPage() {
           </div>
           <div className="flex gap-2">
             <Link
-              to="/leads/nurture"
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-            >
-              🎯 Nurture Board
-            </Link>
-            <Link
               to="/leads/add"
               className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             >

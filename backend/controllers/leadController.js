@@ -1,4 +1,15 @@
 const Lead = require('../models/Lead')
+const { sendMail } = require('../utils/email')
+
+const formatVisitDate = (value) => {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
 
 const getLeads = async (req, res) => {
   try {
@@ -86,8 +97,35 @@ const addTask = async (req, res) => {
   try {
     const lead = await Lead.findById(req.params.id)
     if (!lead) return res.status(404).json({ message: 'Lead not found' })
-    lead.followUpTasks.push({ ...req.body, createdBy: req.user._id })
+    const taskPayload = { ...req.body, createdBy: req.user._id }
+    lead.followUpTasks.push(taskPayload)
     await lead.save()
+
+    // Notify lead when a site visit is scheduled.
+    if (taskPayload.type === 'Site Visit' && lead.email) {
+      const formattedDate = formatVisitDate(taskPayload.dueDate)
+      const subject = 'Your site visit has been scheduled'
+      const text = [
+        `Hello ${lead.name || 'there'},`,
+        '',
+        'Your site visit has been scheduled.',
+        formattedDate ? `Date & Time: ${formattedDate}` : null,
+        taskPayload.note ? `Details: ${taskPayload.note}` : null,
+        '',
+        'If you need to reschedule, please reply to this email or contact our team.',
+      ].filter(Boolean).join('\n')
+
+      try {
+        await sendMail({
+          to: lead.email,
+          subject,
+          text,
+        })
+      } catch (mailErr) {
+        console.error('Site visit email failed:', mailErr.message)
+      }
+    }
+
     res.json(lead.followUpTasks)
   } catch (err) {
     res.status(500).json({ message: err.message })

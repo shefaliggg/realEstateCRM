@@ -52,15 +52,6 @@ export default function LeadSourcesPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Lead Sources</h2>
         </div>
-        <button
-          onClick={() => setShowAddSource(true)}
-          className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Source
-        </button>
       </div>
 
       {/* Stats */}

@@ -78,15 +78,6 @@ export default function MyLeadsPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">My Leads</h2>
         </div>
-        <Link
-          to="/leads"
-          className="text-sm font-medium text-primary-600 hover:text-primary-800 flex items-center gap-1"
-        >
-          View All
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
       </div>
 
       {/* Stat chips */}

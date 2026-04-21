@@ -22,7 +22,10 @@ function CardView({ projects }) {
           to={`/projects/${project._id}`}
           className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 block"
         >
-          <div className="mb-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+          <div className="relative mb-4 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+            <span className={`absolute left-3 top-3 z-10 text-xs font-medium px-2.5 py-1 rounded-full shadow-sm ${STATUS_COLORS[project.status] || 'bg-gray-100 text-gray-600'}`}>
+              {project.status}
+            </span>
             {project.images?.[0] ? (
               <img
                 src={project.images[0]}
@@ -36,14 +39,9 @@ function CardView({ projects }) {
               </div>
             )}
           </div>
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{project.name}</h2>
-              <p className="text-sm text-gray-500">{project.developerName}</p>
-            </div>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[project.status] || 'bg-gray-100 text-gray-600'}`}>
-              {project.status}
-            </span>
+          <div className="mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">{project.name}</h2>
+            <p className="text-sm text-gray-500">{project.developerName}</p>
           </div>
           <div className="flex flex-wrap gap-3 text-xs text-gray-500">
             {project.location?.city && (
