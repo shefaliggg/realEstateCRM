@@ -84,12 +84,15 @@ export default function AddProjectPage() {
     bhkTypes: [],
     amenities: '',
     description: '',
+    managedBy: [],
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [newBlock, setNewBlock] = useState('')
   const [imageFiles, setImageFiles] = useState([])
   const [videoFiles, setVideoFiles] = useState([])
+  const [users, setUsers] = useState([])
+  const [usersLoading, setUsersLoading] = useState(false)
   const imageFilesRef = useRef([])
   const videoFilesRef = useRef([])
 
@@ -106,6 +109,14 @@ export default function AddProjectPage() {
       imageFilesRef.current.forEach((image) => URL.revokeObjectURL(image.preview))
       videoFilesRef.current.forEach((video) => URL.revokeObjectURL(video.preview))
     }
+  }, [])
+
+  useEffect(() => {
+    setUsersLoading(true)
+    api.get('/users')
+      .then(r => setUsers(r.data))
+      .catch(() => {})
+      .finally(() => setUsersLoading(false))
   }, [])
 
   const handleChange = e => {
@@ -201,13 +212,8 @@ export default function AddProjectPage() {
     setCurrentStep(2)
   }
 
-  const handleSubmit = async e => {
-    e.preventDefault()
+  const handleNextToStep3 = () => {
     setError('')
-    if (currentStep !== 2) {
-      setError('Please complete Step 1 first')
-      return
-    }
     if (!form.name || !form.developerName) {
       setError('Project name and developer name are required')
       return
@@ -220,6 +226,13 @@ export default function AddProjectPage() {
       setError('Select at least one BHK type')
       return
     }
+    setCurrentStep(3)
+  }
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setError('')
+    if (currentStep !== 3) return
     setLoading(true)
     try {
       const formData = new FormData()
@@ -240,6 +253,7 @@ export default function AddProjectPage() {
       formData.append('blocks', JSON.stringify([...new Set(form.blocks.map(b => b.trim()).filter(Boolean))]))
       formData.append('bhkTypes', JSON.stringify(form.bhkTypes))
       formData.append('amenities', JSON.stringify(form.amenities ? form.amenities.split(',').map(a => a.trim()).filter(Boolean) : []))
+      formData.append('managedBy', JSON.stringify(form.managedBy))
 
       imageFiles.forEach(({ file }) => {
         formData.append('images', file)
@@ -286,8 +300,13 @@ export default function AddProjectPage() {
               </div>
               <div className="h-px flex-1 mx-4 bg-gray-200" />
               <div className="flex items-center gap-2">
-                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold ${currentStep === 2 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>2</span>
+                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold ${currentStep === 2 ? 'bg-primary-600 text-white' : currentStep > 2 ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'}`}>2</span>
                 <span className="font-medium text-gray-700">Project Details</span>
+              </div>
+              <div className="h-px flex-1 mx-4 bg-gray-200" />
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full font-semibold ${currentStep === 3 ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>3</span>
+                <span className="font-medium text-gray-700">Assign To</span>
               </div>
             </div>
           </div>
@@ -591,15 +610,89 @@ export default function AddProjectPage() {
             >
               Back
             </button>
-            <button type="submit" disabled={loading}
-              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-              {loading ? 'Creating...' : 'Create Project'}
+            <button
+              type="button"
+              onClick={handleNextToStep3}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              Continue to Step 3
             </button>
             <Link to="/projects" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
               Cancel
             </Link>
           </div>
           </>
+          )}
+
+          {currentStep === 3 && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 space-y-4">
+              <h2 className="font-semibold text-gray-800">Step 3: Assign Team Members</h2>
+              <p className="text-sm text-gray-500">Select users who will manage this project. You can skip this and assign later.</p>
+
+              {usersLoading && <p className="text-sm text-gray-400">Loading users...</p>}
+
+              {!usersLoading && users.length === 0 && (
+                <p className="text-sm text-gray-400">No users found.</p>
+              )}
+
+              {!usersLoading && users.length > 0 && (
+                <div className="divide-y divide-gray-50 border border-gray-100 rounded-lg overflow-hidden">
+                  {users.map(user => {
+                    const selected = form.managedBy.includes(user._id)
+                    return (
+                      <label
+                        key={user._id}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
+                          selected ? 'bg-primary-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() =>
+                            setForm(f => ({
+                              ...f,
+                              managedBy: selected
+                                ? f.managedBy.filter(id => id !== user._id)
+                                : [...f.managedBy, user._id],
+                            }))
+                          }
+                          className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.email} · {user.role}</p>
+                        </div>
+                        {selected && (
+                          <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-0.5 rounded-full border border-primary-100">Assigned</span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+
+              {form.managedBy.length > 0 && (
+                <p className="text-xs text-gray-500">{form.managedBy.length} user{form.managedBy.length !== 1 ? 's' : ''} selected</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(2)}
+                  className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Back
+                </button>
+                <button type="submit" disabled={loading}
+                  className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
+                  {loading ? 'Creating...' : 'Create Project'}
+                </button>
+                <Link to="/projects" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+                  Cancel
+                </Link>
+              </div>
+            </div>
           )}
         </form>
       </div>

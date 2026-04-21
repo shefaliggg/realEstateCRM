@@ -24,7 +24,19 @@ jobs:
 
             echo "📥 Fetching latest code..."
             git fetch origin
+
+            echo "💾 Preserving uploaded files..."
+            cp -r backend/uploads /tmp/crm_uploads_backup 2>/dev/null || true
+
             git reset --hard origin/main
+
+            echo "♻️ Restoring uploaded files..."
+            if [ -d /tmp/crm_uploads_backup ]; then
+              cp -r /tmp/crm_uploads_backup/. backend/uploads/
+              rm -rf /tmp/crm_uploads_backup
+            fi
+
+            mkdir -p backend/uploads/project-images
 
             echo "📦 Installing backend dependencies..."
             cd backend

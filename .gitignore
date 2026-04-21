@@ -28,6 +28,10 @@ Thumbs.db
 
 # Editor
 .vscode/
+
+# Uploaded files (keep folder structure via .gitkeep)
+backend/uploads/project-images/*
+!backend/uploads/project-images/.gitkeep
 .idea/
 *.suo
 *.ntvs*
