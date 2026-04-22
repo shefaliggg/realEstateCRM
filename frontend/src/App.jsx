@@ -33,6 +33,15 @@ import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import PermissionsPage from './pages/PermissionsPage'
 import UserProfilePage from './pages/UserProfilePage'
+import PostSalesCustomersPage from './pages/PostSalesCustomersPage'
+import PostSalesBookingsPage from './pages/PostSalesBookingsPage'
+import PostSalesPaymentSchedulesPage from './pages/PostSalesPaymentSchedulesPage'
+import PostSalesPaymentsPage from './pages/PostSalesPaymentsPage'
+import PostSalesDocumentsPage from './pages/PostSalesDocumentsPage'
+import PostSalesReferralsPage from './pages/PostSalesReferralsPage'
+import SalesReportsPage from './pages/SalesReportsPage'
+import MarketingReportsPage from './pages/MarketingReportsPage'
+import PerformanceReportsPage from './pages/PerformanceReportsPage'
 
 function PR({ children, allowedRoles }) {
   return <PrivateRoute allowedRoles={allowedRoles}>{children}</PrivateRoute>
@@ -80,6 +89,19 @@ export default function App() {
           <Route path="/partners/:id" element={<PR><PartnerProfilePage /></PR>} />
           <Route path="/partners/leads" element={<PR><PartnerLeadsPage /></PR>} />
           <Route path="/partners/payouts" element={<PR><PartnerPayoutsPage /></PR>} />
+
+          {/* Post-Sales */}
+          <Route path="/post-sales/customers" element={<PR><PostSalesCustomersPage /></PR>} />
+          <Route path="/post-sales/bookings" element={<PR><PostSalesBookingsPage /></PR>} />
+          <Route path="/post-sales/payment-schedules" element={<PR><PostSalesPaymentSchedulesPage /></PR>} />
+          <Route path="/post-sales/payments" element={<PR><PostSalesPaymentsPage /></PR>} />
+          <Route path="/post-sales/documents" element={<PR><PostSalesDocumentsPage /></PR>} />
+          <Route path="/post-sales/referrals" element={<PR><PostSalesReferralsPage /></PR>} />
+
+          {/* Reports */}
+          <Route path="/reports/sales" element={<PR><SalesReportsPage /></PR>} />
+          <Route path="/reports/marketing" element={<PR><MarketingReportsPage /></PR>} />
+          <Route path="/reports/performance" element={<PR><PerformanceReportsPage /></PR>} />
 
           {/* Users and Roles */}
           <Route path="/users" element={<PR allowedRoles={['admin']}><UsersRolesPage /></PR>} />

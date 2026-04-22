@@ -174,12 +174,26 @@ function getInitialOpen(pathname) {
   return open
 }
 
+function getSectionOpen(pathname) {
+  for (const { group, items } of NAV) {
+    if (!group) continue
+    for (const item of items) {
+      const paths = item.sub ? item.sub.map((s) => s.path) : item.path ? [item.path] : []
+      if (paths.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+        return { CORE: group === 'CORE', MARKETING: group === 'MARKETING' }
+      }
+    }
+  }
+  // Dashboard or unknown — keep both collapsed
+  return { CORE: false, MARKETING: false }
+}
+
 export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [open, setOpen] = useState(() => getInitialOpen(location.pathname))
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [sectionOpen, setSectionOpen] = useState({ CORE: false, MARKETING: false })
+  const [sectionOpen, setSectionOpen] = useState(() => getSectionOpen(location.pathname))
   const [, setPermissionsVersion] = useState(0)
 
   const { user: authUser } = useAuth()
@@ -191,6 +205,10 @@ export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout 
     window.addEventListener('role-permissions-updated', syncPermissions)
     return () => window.removeEventListener('role-permissions-updated', syncPermissions)
   }, [])
+
+  useEffect(() => {
+    setSectionOpen(getSectionOpen(location.pathname))
+  }, [location.pathname])
 
   function handleLogout() {
     setUserMenuOpen(false)
