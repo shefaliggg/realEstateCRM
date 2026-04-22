@@ -42,6 +42,17 @@ import PostSalesReferralsPage from './pages/PostSalesReferralsPage'
 import SalesReportsPage from './pages/SalesReportsPage'
 import MarketingReportsPage from './pages/MarketingReportsPage'
 import PerformanceReportsPage from './pages/PerformanceReportsPage'
+import MarketingCampaignsPage from './pages/MarketingCampaignsPage'
+import CreateCampaignPage from './pages/CreateCampaignPage'
+import CampaignWorkspacePage from './pages/CampaignWorkspacePage'
+import MarketingSettingsPage from './pages/MarketingSettingsPage'
+import LeadGenerationListsPage from './pages/LeadGenerationListsPage'
+import LeadGenerationGoogleMapsPage from './pages/LeadGenerationGoogleMapsPage'
+import LeadGenerationImportPage from './pages/LeadGenerationImportPage'
+import EmailCampaignsPage from './pages/EmailCampaignsPage'
+import EmailSettingsPage from './pages/EmailSettingsPage'
+import EmailTemplatesPage from './pages/EmailTemplatesPage'
+import EmailCampaignDetailPage from './pages/EmailCampaignDetailPage'
 
 function PR({ children, allowedRoles }) {
   return <PrivateRoute allowedRoles={allowedRoles}>{children}</PrivateRoute>
@@ -102,6 +113,23 @@ export default function App() {
           <Route path="/reports/sales" element={<PR><SalesReportsPage /></PR>} />
           <Route path="/reports/marketing" element={<PR><MarketingReportsPage /></PR>} />
           <Route path="/reports/performance" element={<PR><PerformanceReportsPage /></PR>} />
+
+          {/* AI Marketing Campaigns */}
+          <Route path="/marketing/campaigns" element={<PR><MarketingCampaignsPage /></PR>} />
+          <Route path="/marketing/campaigns/create" element={<PR><CreateCampaignPage /></PR>} />
+          <Route path="/marketing/campaigns/:id" element={<PR><CampaignWorkspacePage /></PR>} />
+          <Route path="/marketing/campaigns/:id/settings" element={<PR><CampaignWorkspacePage forcedTab="settings" /></PR>} />
+          <Route path="/marketing/campaigns/:id/analytics" element={<PR><CampaignWorkspacePage forcedTab="analytics" /></PR>} />
+          <Route path="/marketing/settings" element={<Navigate to="/marketing/settings/company-knowledge" replace />} />
+          <Route path="/marketing/settings/company-knowledge" element={<PR><MarketingSettingsPage /></PR>} />
+          <Route path="/marketing/lead-generation" element={<Navigate to="/marketing/lead-generation/lists" replace />} />
+          <Route path="/marketing/lead-generation/lists" element={<PR><LeadGenerationListsPage /></PR>} />
+          <Route path="/marketing/lead-generation/google-maps" element={<PR><LeadGenerationGoogleMapsPage /></PR>} />
+          <Route path="/marketing/lead-generation/import" element={<PR><LeadGenerationImportPage /></PR>} />
+          <Route path="/marketing/email" element={<PR><EmailCampaignsPage /></PR>} />
+          <Route path="/marketing/email/:id" element={<PR><EmailCampaignDetailPage /></PR>} />
+          <Route path="/marketing/email/settings" element={<PR><EmailSettingsPage /></PR>} />
+          <Route path="/marketing/email/templates" element={<PR><EmailTemplatesPage /></PR>} />
 
           {/* Users and Roles */}
           <Route path="/users" element={<PR allowedRoles={['admin']}><UsersRolesPage /></PR>} />

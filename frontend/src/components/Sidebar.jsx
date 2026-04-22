@@ -81,8 +81,21 @@ const NAV = [
         ],
       },
       {
+        label: 'Lead Generation', icon: 'target', sub: [
+          { label: 'Lead Lists', path: '/marketing/lead-generation/lists' },
+          { label: 'Google Maps Leads', path: '/marketing/lead-generation/google-maps' },
+          { label: 'Import Leads', path: '/marketing/lead-generation/import' },
+        ],
+      },
+      {
+        label: 'Settings', icon: 'user', sub: [
+          { label: 'Company Knowledge', path: '/marketing/settings/company-knowledge' },
+        ],
+      },
+      {
         label: 'Email Marketing', icon: 'email', sub: [
           { label: 'Campaigns', path: '/marketing/email' },
+          { label: 'Settings', path: '/marketing/email/settings' },
           { label: 'Templates', path: '/marketing/email/templates' },
         ],
       },

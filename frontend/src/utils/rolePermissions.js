@@ -19,6 +19,8 @@ export const MODULE_OPTIONS = [
   'Users & Roles',
   'Reports',
   'Campaigns',
+  'Lead Generation',
+  'Settings',
   'Email Marketing',
   'WhatsApp Marketing',
   'SMS Marketing',
