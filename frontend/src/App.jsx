@@ -6,12 +6,15 @@ import AcceptInvitePage from './pages/AcceptInvitePage'
 import UsersRolesPage from './pages/UsersRolesPage'
 import DashboardPage from './pages/DashboardPage'
 import ProjectsPage from './pages/ProjectsPage'
-import AddProjectPage from './pages/AddProjectPage'
+import AddBuildingPage from './pages/AddBuildingPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import EditProjectPage from './pages/EditProjectPage'
+import ProjectTypePage from './pages/ProjectTypePage'
 import InventoryPage from './pages/InventoryPage'
 import BlockPage from './pages/BlockPage'
 import UnitDetailPage from './pages/UnitDetailPage'
 import AddUnitPage from './pages/AddUnitPage'
+import AddTowerPage from './pages/AddTowerPage'
 import AllLeadsPage from './pages/AllLeadsPage'
 import AddLeadPage from './pages/AddLeadPage'
 import LeadDetailPage from './pages/LeadDetailPage'
@@ -52,7 +55,6 @@ import LeadGenerationImportPage from './pages/LeadGenerationImportPage'
 import EmailCampaignsPage from './pages/EmailCampaignsPage'
 import EmailSettingsPage from './pages/EmailSettingsPage'
 import EmailTemplatesPage from './pages/EmailTemplatesPage'
-import EmailCampaignDetailPage from './pages/EmailCampaignDetailPage'
 
 function PR({ children, allowedRoles }) {
   return <PrivateRoute allowedRoles={allowedRoles}>{children}</PrivateRoute>
@@ -69,11 +71,14 @@ export default function App() {
 
           {/* Projects + Inventory */}
           <Route path="/projects" element={<PR><ProjectsPage /></PR>} />
-          <Route path="/projects/add" element={<PR><AddProjectPage /></PR>} />
+          <Route path="/projects/add" element={<PR><AddBuildingPage /></PR>} />
+          <Route path="/projects/types/:type" element={<PR><ProjectTypePage /></PR>} />
+          <Route path="/projects/:id/edit" element={<PR><EditProjectPage /></PR>} />
           <Route path="/projects/:id" element={<PR><ProjectDetailPage /></PR>} />
           <Route path="/inventory" element={<PR><InventoryPage /></PR>} />
           <Route path="/projects/:projectId/blocks/:block" element={<PR><BlockPage /></PR>} />
           <Route path="/projects/:projectId/units/add" element={<PR><AddUnitPage /></PR>} />
+          <Route path="/projects/:projectId/towers/add" element={<PR><AddTowerPage /></PR>} />
           <Route path="/units/:id" element={<PR><UnitDetailPage /></PR>} />
 
           {/* Leads */}
@@ -127,7 +132,6 @@ export default function App() {
           <Route path="/marketing/lead-generation/google-maps" element={<PR><LeadGenerationGoogleMapsPage /></PR>} />
           <Route path="/marketing/lead-generation/import" element={<PR><LeadGenerationImportPage /></PR>} />
           <Route path="/marketing/email" element={<PR><EmailCampaignsPage /></PR>} />
-          <Route path="/marketing/email/:id" element={<PR><EmailCampaignDetailPage /></PR>} />
           <Route path="/marketing/email/settings" element={<PR><EmailSettingsPage /></PR>} />
           <Route path="/marketing/email/templates" element={<PR><EmailTemplatesPage /></PR>} />
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 
 const MOCK_PROPERTIES = [
   {
-    id: 1, title: 'Skyline Residency – 3BHK', type: 'Apartment', status: 'Available',
+    id: 1, title: 'Skyline Residency – 3BHK', type: 'Building', status: 'Available',
     price: 8500000, area: 1450, beds: 3, baths: 2,
     city: 'Mumbai', locality: 'Andheri West', floor: '12th Floor',
     project: 'Skyline Heights',
@@ -21,7 +21,7 @@ const MOCK_PROPERTIES = [
     project: 'Tech Square',
   },
   {
-    id: 4, title: 'Sunrise Apartments – 2BHK', type: 'Apartment', status: 'Sold',
+    id: 4, title: 'Sunrise Buildings – 2BHK', type: 'Building', status: 'Sold',
     price: 5200000, area: 980, beds: 2, baths: 2,
     city: 'Bangalore', locality: 'Whitefield', floor: '4th Floor',
     project: 'Sunrise Residencia',
@@ -33,7 +33,7 @@ const MOCK_PROPERTIES = [
     project: null,
   },
   {
-    id: 6, title: 'Luxury Penthouse – 4BHK', type: 'Apartment', status: 'Under Construction',
+    id: 6, title: 'Luxury Penthouse – 4BHK', type: 'Building', status: 'Under Construction',
     price: 32000000, area: 4200, beds: 4, baths: 5,
     city: 'Mumbai', locality: 'Worli', floor: '32nd Floor',
     project: 'The Crown Tower',
@@ -48,13 +48,13 @@ const STATUS_STYLES = {
 }
 
 const TYPE_STYLES = {
-  Apartment: 'bg-primary-50 text-primary-700',
+  Building: 'bg-primary-50 text-primary-700',
   Villa: 'bg-purple-50 text-purple-700',
   Commercial: 'bg-cyan-50 text-cyan-700',
   Plot: 'bg-lime-50 text-lime-700',
 }
 
-const TYPES = ['All', 'Apartment', 'Villa', 'Commercial', 'Plot']
+const TYPES = ['All', 'Building', 'Villa', 'Commercial', 'Plot']
 const STATUSES = ['All', 'Available', 'Booked', 'Sold', 'Under Construction']
 
 function formatPrice(p) {

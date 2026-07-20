@@ -18,6 +18,42 @@ const LEGEND = [
   { label: 'Cancelled', color: 'bg-red-300' },
 ]
 
+function formatPrice(v) {
+  const n = Number(v)
+  if (!n) return ''
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(n % 10000000 === 0 ? 0 : 2)} Cr`
+  if (n >= 100000) return `₹${(n / 100000).toFixed(n % 100000 === 0 ? 0 : 1)} L`
+  return `₹${n.toLocaleString('en-IN')}`
+}
+
+function FlatCard({ unit }) {
+  const price = unit.totalPrice || unit.basePrice
+  return (
+    <Link
+      to={`/units/${unit._id}`}
+      className="rounded-xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:border-primary-200 transition-all p-4 block"
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <h4 className="font-semibold text-gray-900 truncate">Flat {unit.unitNo}</h4>
+          <p className="text-xs text-gray-400">Floor {unit.floor} · {unit.bhkType}{unit.cornerUnit ? ' · Corner' : ''}</p>
+        </div>
+        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
+          {unit.status}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-sm mb-2">
+        <span className="text-gray-600">{unit.carpetArea ? `${unit.carpetArea} Sq.ft` : '—'}</span>
+        <span className="font-bold text-gray-900">{price ? formatPrice(price) : 'Price TBD'}</span>
+      </div>
+      <div className="flex items-center justify-between text-xs text-gray-400">
+        <span>Facing {unit.facing || '—'}</span>
+        <span>Parking {unit.parkingNumber || (unit.parkingIncluded ? 'Included' : '—')}</span>
+      </div>
+    </Link>
+  )
+}
+
 export default function BlockPage() {
   const { projectId, block } = useParams()
   const [project, setProject] = useState(null)
@@ -26,6 +62,7 @@ export default function BlockPage() {
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [bhkFilter, setBhkFilter] = useState('All')
+  const [view, setView] = useState('cards')
 
   useEffect(() => {
     Promise.all([
@@ -99,7 +136,7 @@ export default function BlockPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
@@ -117,7 +154,22 @@ export default function BlockPage() {
           <option value="All">All BHK</option>
           {project?.bhkTypes?.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
-        <span className="text-sm text-gray-400 self-center">{filtered.length} flat{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="text-sm text-gray-400">{filtered.length} flat{filtered.length !== 1 ? 's' : ''}</span>
+
+        <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          <button
+            onClick={() => setView('cards')}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${view === 'cards' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            ⊞ Cards
+          </button>
+          <button
+            onClick={() => setView('compact')}
+            className={`px-3 py-1.5 rounded-md text-sm transition-colors ${view === 'compact' ? 'bg-white shadow text-gray-900 font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            ☰ Compact
+          </button>
+        </div>
       </div>
 
       {/* Legend */}
@@ -130,7 +182,7 @@ export default function BlockPage() {
         ))}
       </div>
 
-      {/* Floor grid */}
+      {/* Units */}
       {units.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm">
           <p className="text-4xl mb-3">🏢</p>
@@ -145,6 +197,20 @@ export default function BlockPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-10 text-gray-400 text-sm">No flats match the selected filters.</div>
+      ) : view === 'cards' ? (
+        <div className="space-y-5">
+          {floors.map(floor => (
+            <div key={floor}>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Floor {floor}</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {filtered
+                  .filter(u => u.floor === floor)
+                  .sort((a, b) => String(a.unitNo).localeCompare(String(b.unitNo), undefined, { numeric: true }))
+                  .map(u => <FlatCard key={u._id} unit={u} />)}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="space-y-3">

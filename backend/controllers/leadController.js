@@ -17,6 +17,7 @@ const getLeads = async (req, res) => {
     if (req.query.nurtureStage) filter.nurtureStage = req.query.nurtureStage
     if (req.query.source) filter.source = req.query.source
     if (req.query.assignedTo) filter.assignedTo = req.query.assignedTo
+    if (req.query.project) filter.project = req.query.project
     if (req.query.isActive !== undefined) filter.isActive = req.query.isActive === 'true'
     const leads = await Lead.find(filter)
       .populate('assignedTo', 'name email')

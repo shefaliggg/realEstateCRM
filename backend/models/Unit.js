@@ -14,9 +14,37 @@ const unitSchema = new mongoose.Schema(
     floor: { type: Number, required: true },
     unitNo: { type: String, required: true, trim: true },     // e.g. "101", "A-301"
     bhkType: { type: String, required: true },                // "2 BHK", "2.5 BHK", "3 BHK"
-    carpetArea: { type: Number },                             // sqft
-    basePrice: { type: Number },                              // INR
     facing: { type: String },
+    cornerUnit: { type: Boolean, default: false },
+
+    carpetArea: { type: Number },                             // sqft
+    builtUpArea: { type: Number },
+    superBuiltUpArea: { type: Number },
+    balconyArea: { type: Number },
+
+    basePrice: { type: Number },                              // INR
+    pricePerSqft: { type: Number },
+    plc: { type: Number },
+    floorRise: { type: Number },
+    parkingCharges: { type: Number },
+    clubCharges: { type: Number },
+    otherCharges: { type: Number },
+    totalPrice: { type: Number },                             // auto-computed from the components above
+
+    parkingIncluded: { type: Boolean, default: false },
+    parkingNumber: { type: String, trim: true },
+
+    possessionStatus: {
+      type: String,
+      enum: ['Ready', 'Under Construction'],
+      default: 'Under Construction',
+    },
+
+    documents: {
+      floorPlan: String,
+      priceSheet: String,
+    },
+
     status: {
       type: String,
       enum: ['Available', 'Reserved', 'Booked', 'Registered', 'Cancelled'],
@@ -31,5 +59,21 @@ const unitSchema = new mongoose.Schema(
 
 // Unique unit per project + block + unitNo
 unitSchema.index({ project: 1, block: 1, unitNo: 1 }, { unique: true })
+
+unitSchema.pre('save', function computeTotalPrice(next) {
+  const hasPricingInput = ['basePrice', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges'].some(
+    (field) => this[field] !== undefined && this[field] !== null
+  )
+  if (hasPricingInput) {
+    this.totalPrice =
+      (this.basePrice || 0) +
+      (this.plc || 0) +
+      (this.floorRise || 0) +
+      (this.parkingCharges || 0) +
+      (this.clubCharges || 0) +
+      (this.otherCharges || 0)
+  }
+  next()
+})
 
 module.exports = mongoose.model('Unit', unitSchema)

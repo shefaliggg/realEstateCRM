@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/axios'
 
-const PROJECT_TYPES = ['Apartments', 'Villas', 'Plots', 'Commercial', 'Mixed Use']
+const PROJECT_TYPES = ['Buildings', 'Villas', 'Plots', 'Commercial', 'Mixed Use']
 
 const STATUS_COLORS = {
   Available: 'bg-green-100 text-green-700',
@@ -17,7 +17,7 @@ export default function InventoryPage() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [activeType, setActiveType] = useState('Apartments')
+  const [activeType, setActiveType] = useState('Buildings')
   const [projectFilter, setProjectFilter] = useState('All')
   const [blockFilter, setBlockFilter] = useState('All')
   const [bhkFilter, setBhkFilter] = useState('All')
@@ -53,7 +53,7 @@ export default function InventoryPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const typeProjects = projects.filter((p) => (p.type || 'Apartments') === activeType)
+  const typeProjects = projects.filter((p) => (p.type || 'Buildings') === activeType)
   const typeProjectIds = new Set(typeProjects.map((p) => p._id))
 
   const typeUnits = units.filter((u) => {

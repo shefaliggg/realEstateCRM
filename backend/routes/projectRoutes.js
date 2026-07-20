@@ -7,6 +7,19 @@ const { getProjects, getProjectById, createProject, updateProject, deleteProject
 const projectMediaUpload = projectImageUpload.fields([
 	{ name: 'images', maxCount: 8 },
 	{ name: 'videos', maxCount: 4 },
+	{ name: 'logo', maxCount: 1 },
+	{ name: 'coverImage', maxCount: 1 },
+	{ name: 'floorPlanImages', maxCount: 8 },
+	{ name: 'masterPlanImage', maxCount: 1 },
+	{ name: 'constructionProgressPhotos', maxCount: 12 },
+	{ name: 'reraCertificate', maxCount: 1 },
+	{ name: 'brochure', maxCount: 1 },
+	{ name: 'priceSheet', maxCount: 1 },
+	{ name: 'paymentPlan', maxCount: 1 },
+	{ name: 'occupancyCertificate', maxCount: 1 },
+	{ name: 'completionCertificate', maxCount: 1 },
+	{ name: 'legalDocuments', maxCount: 5 },
+	{ name: 'approvalDocuments', maxCount: 5 },
 ])
 
 router.route('/').get(protect, getProjects).post(protect, adminOnly, projectMediaUpload, createProject)

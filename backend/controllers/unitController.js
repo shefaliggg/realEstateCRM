@@ -1,5 +1,37 @@
 const Unit = require('../models/Unit')
 
+const uploadedFileUrl = (bucket) =>
+  bucket && bucket[0] ? `/uploads/project-images/${bucket[0].filename}` : undefined
+
+const NUMBER_FIELDS = [
+  'floor', 'carpetArea', 'builtUpArea', 'superBuiltUpArea', 'balconyArea',
+  'basePrice', 'pricePerSqft', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges',
+]
+const BOOLEAN_FIELDS = ['cornerUnit', 'parkingIncluded']
+
+const normalizeUnitBody = (body, files = {}) => {
+  const payload = { ...body }
+  NUMBER_FIELDS.forEach((field) => {
+    if (body[field] !== undefined && body[field] !== '') payload[field] = Number(body[field])
+    else if (body[field] === '') delete payload[field]
+  })
+  BOOLEAN_FIELDS.forEach((field) => {
+    if (body[field] !== undefined) payload[field] = body[field] === 'true' || body[field] === true
+  })
+
+  const floorPlan = uploadedFileUrl(files.floorPlan)
+  const priceSheet = uploadedFileUrl(files.priceSheet)
+  if (floorPlan || priceSheet) {
+    payload.documents = { ...(payload.documents || {}) }
+    if (floorPlan) payload.documents.floorPlan = floorPlan
+    if (priceSheet) payload.documents.priceSheet = priceSheet
+  }
+  delete payload.floorPlan
+  delete payload.priceSheet
+
+  return payload
+}
+
 const getUnits = async (req, res) => {
   try {
     const filter = { project: req.params.projectId }
@@ -28,21 +60,26 @@ const getUnitById = async (req, res) => {
 
 const createUnit = async (req, res) => {
   try {
-    const unit = new Unit({ ...req.body, project: req.params.projectId })
+    const payload = normalizeUnitBody(req.body, req.files || {})
+    const unit = new Unit({ ...payload, project: req.params.projectId })
     await unit.save()
     res.status(201).json(unit)
   } catch (err) {
+    if (err.code === 11000) return res.status(400).json({ message: 'A unit with this number already exists in this block' })
     res.status(400).json({ message: err.message })
   }
 }
 
 const updateUnit = async (req, res) => {
   try {
-    const unit = await Unit.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    })
+    const payload = normalizeUnitBody(req.body, req.files || {})
+    const unit = await Unit.findById(req.params.id)
     if (!unit) return res.status(404).json({ message: 'Unit not found' })
+    Object.entries(payload).forEach(([key, value]) => {
+      if (key === 'documents') unit.documents = { ...(unit.documents?.toObject?.() || unit.documents || {}), ...value }
+      else unit[key] = value
+    })
+    await unit.save()
     res.json(unit)
   } catch (err) {
     res.status(400).json({ message: err.message })
@@ -59,4 +96,64 @@ const deleteUnit = async (req, res) => {
   }
 }
 
-module.exports = { getUnits, getUnitById, createUnit, updateUnit, deleteUnit }
+const computeTotalPrice = (u) => {
+  const hasPricingInput = ['basePrice', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges'].some(
+    (field) => u[field] !== undefined && u[field] !== null && u[field] !== ''
+  )
+  if (!hasPricingInput) return undefined
+  return (Number(u.basePrice) || 0) + (Number(u.plc) || 0) + (Number(u.floorRise) || 0) +
+    (Number(u.parkingCharges) || 0) + (Number(u.clubCharges) || 0) + (Number(u.otherCharges) || 0)
+}
+
+const bulkCreateUnits = async (req, res) => {
+  try {
+    const { units } = req.body
+    if (!Array.isArray(units) || units.length === 0) {
+      return res.status(400).json({ message: 'units array is required' })
+    }
+    // insertMany doesn't run the pre('save') hook, so totalPrice is computed here instead
+    const docs = units.map((u) => ({ ...u, project: req.params.projectId, totalPrice: computeTotalPrice(u) }))
+    const created = await Unit.insertMany(docs, { ordered: false })
+    res.status(201).json({ message: `${created.length} unit(s) created`, units: created })
+  } catch (err) {
+    const created = err.insertedDocs?.length || err.result?.result?.nInserted || 0
+    res.status(created > 0 ? 207 : 400).json({
+      message: created > 0
+        ? `${created} unit(s) created, some were skipped (likely duplicate unit numbers)`
+        : (err.message || 'Failed to create units'),
+    })
+  }
+}
+
+const bulkUpdateUnits = async (req, res) => {
+  try {
+    const { unitIds, status, note, ...priceFields } = req.body
+    if (!Array.isArray(unitIds) || unitIds.length === 0) {
+      return res.status(400).json({ message: 'unitIds is required' })
+    }
+
+    const pricingKeys = ['basePrice', 'pricePerSqft', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges']
+    const units = await Unit.find({ _id: { $in: unitIds } })
+
+    await Promise.all(
+      units.map(async (unit) => {
+        if (status && status !== unit.status) {
+          unit.status = status
+          unit.statusHistory.push({ status, changedBy: req.user._id, note: note || 'Bulk update' })
+        }
+        pricingKeys.forEach((key) => {
+          if (priceFields[key] !== undefined && priceFields[key] !== '') {
+            unit[key] = Number(priceFields[key])
+          }
+        })
+        await unit.save()
+      })
+    )
+
+    res.json({ message: `${units.length} unit(s) updated` })
+  } catch (err) {
+    res.status(400).json({ message: err.message })
+  }
+}
+
+module.exports = { getUnits, getUnitById, createUnit, updateUnit, deleteUnit, bulkCreateUnits, bulkUpdateUnits }

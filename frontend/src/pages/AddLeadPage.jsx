@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 
 const SOURCES = ['Walk-in', 'Website', 'Referral', 'Portal - 99acres', 'Portal - MagicBricks', 'Portal - Housing', 'Google Ads', 'Facebook', 'Instagram', 'Cold Call', 'Event', 'Other']
@@ -9,6 +9,9 @@ const cls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ou
 
 export default function AddLeadPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const projectId = searchParams.get('project') || ''
+  const backLink = projectId ? `/projects/${projectId}` : '/leads'
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -39,9 +42,10 @@ export default function AddLeadPage() {
         ...form,
         budget: form.budget ? Number(form.budget) : undefined,
         leadScore: Number(form.leadScore),
+        project: projectId || undefined,
       }
       const res = await api.post('/leads', payload)
-      navigate(`/leads/${res.data._id}`)
+      navigate(projectId ? backLink : `/leads/${res.data._id}`)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create lead')
     } finally {
@@ -53,7 +57,7 @@ export default function AddLeadPage() {
           <div className="p-6 max-w-2xl mx-auto">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <Link to="/leads" className="hover:text-primary-600">Leads</Link>
+          <Link to={backLink} className="hover:text-primary-600">Leads</Link>
           <span>/</span>
           <span className="text-gray-900 font-medium">Add Lead</span>
         </div>
@@ -152,7 +156,7 @@ export default function AddLeadPage() {
               className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
               {loading ? 'Creating...' : 'Add Lead'}
             </button>
-            <Link to="/leads" className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Link to={backLink} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
               Cancel
             </Link>
           </div>

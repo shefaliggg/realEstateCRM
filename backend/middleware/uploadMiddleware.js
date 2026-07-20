@@ -22,12 +22,16 @@ const storage = multer.diskStorage({
 })
 
 const fileFilter = (_req, file, cb) => {
-  if (file.mimetype?.startsWith('image/') || file.mimetype?.startsWith('video/')) {
+  if (
+    file.mimetype?.startsWith('image/')
+    || file.mimetype?.startsWith('video/')
+    || file.mimetype === 'application/pdf'
+  ) {
     cb(null, true)
     return
   }
 
-  cb(new Error('Only image and video uploads are allowed'))
+  cb(new Error('Only image, video, and PDF uploads are allowed'))
 }
 
 const projectImageUpload = multer({

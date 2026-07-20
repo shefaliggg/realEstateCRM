@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-const PROPERTY_TYPES = ['Apartment', 'Villa', 'Plot', 'Commercial', 'Studio', 'Penthouse', 'Row House']
+const PROPERTY_TYPES = ['Building', 'Villa', 'Plot', 'Commercial', 'Studio', 'Penthouse', 'Row House']
 const STATUSES = ['Available', 'Booked', 'Sold', 'Under Construction']
 const FURNISHINGS = ['Unfurnished', 'Semi-Furnished', 'Fully Furnished']
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
 
 const EMPTY = {
-  title: '', type: 'Apartment', status: 'Available',
+  title: '', type: 'Building', status: 'Available',
   project: '', builder: '',
   address: '', locality: '', city: '', state: '', pincode: '',
   price: '', pricePerSqft: '', isNegotiable: false,
@@ -24,6 +24,31 @@ const AMENITY_LIST = [
   'Security / CCTV', 'Power Backup', 'Lift', 'Garden / Landscape', 'Indoor Games',
   'Multipurpose Hall', 'Basketball Court', 'Tennis Court', 'Yoga Room', 'Visitor Parking',
 ]
+
+function amenityIcon(name) {
+  const n = name.toLowerCase()
+  if (n.includes('pool')) return '🏊'
+  if (n.includes('gym')) return '🏋️'
+  if (n.includes('club')) return '🏛️'
+  if (n.includes('indoor game')) return '🎮'
+  if (n.includes('outdoor sport')) return '🏸'
+  if (n.includes('jogging') || n.includes('track')) return '🏃'
+  if (n.includes('play')) return '🧒'
+  if (n.includes('multipurpose') || n.includes('hall')) return '🏢'
+  if (n.includes('power backup')) return '🔋'
+  if (n.includes('lift')) return '🛗'
+  if (n.includes('cctv') || n.includes('security')) return '🛡️'
+  if (n.includes('parking')) return '🅿️'
+  if (n.includes('ev charg')) return '🔌'
+  if (n.includes('garden') || n.includes('landscape')) return '🌳'
+  if (n.includes('temple')) return '🛕'
+  if (n.includes('market')) return '🛒'
+  if (n.includes('pharmacy')) return '💊'
+  if (n.includes('basketball')) return '🏀'
+  if (n.includes('tennis')) return '🎾'
+  if (n.includes('yoga')) return '🧘'
+  return '✨'
+}
 
 function Field({ label, required, children, hint }) {
   return (
@@ -125,7 +150,7 @@ export default function AddPropertyPage() {
                   <input
                     value={form.title}
                     onChange={(e) => set('title', e.target.value)}
-                    placeholder="e.g. Skyline Residency – 3BHK Apartment"
+                    placeholder="e.g. Skyline Residency – 3BHK Building"
                     className={`${inputCls} ${errors.title ? 'border-red-400 focus:ring-red-400' : ''}`}
                   />
                   {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
@@ -320,7 +345,7 @@ export default function AddPropertyPage() {
                         : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-700'
                     }`}
                   >
-                    {selected && <span className="mr-1">✓</span>}
+                    <span className="mr-1">{amenityIcon(a)}</span>
                     {a}
                   </button>
                 )

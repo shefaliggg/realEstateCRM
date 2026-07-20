@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 const MOCK_MY_DEALS = [
   {
     id: 1,
-    name: 'Skyline Residency - 2BHK Apartment',
+    name: 'Skyline Residency - 2BHK Building',
     lead: 'Ankit Joshi',
     stage: 'Proposal Sent',
     value: 5000000,

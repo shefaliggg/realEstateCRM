@@ -13,8 +13,11 @@ const NAV = [
     items: [
       {
         label: 'Projects', icon: 'building', sub: [
-          { label: 'All Projects', path: '/projects' },
-          { label: 'Add Project', path: '/projects/add' },
+          { label: 'Buildings', path: '/projects/types/buildings' },
+          { label: 'Villas', path: '/projects/types/villas' },
+          { label: 'Plots', path: '/projects/types/plots' },
+          { label: 'Commercial', path: '/projects/types/commercial' },
+          { label: 'Mixed Use', path: '/projects/types/mixed-use' },
           { label: 'Inventory', path: '/inventory' },
         ],
       },

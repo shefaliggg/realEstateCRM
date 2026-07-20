@@ -5,7 +5,7 @@ const MOCK_PROPERTIES = {
   1: {
     id: 1,
     title: 'Skyline Residency - 3BHK',
-    type: 'Apartment',
+    type: 'Building',
     status: 'Available',
     price: 8500000,
     pricePerSqft: 5862,
@@ -19,7 +19,7 @@ const MOCK_PROPERTIES = {
     pincode: '400053',
     project: 'Skyline Heights',
     description:
-      'A premium 3BHK apartment in Andheri West with modern interiors, modular kitchen, and large balconies.',
+      'A premium 3BHK building in Andheri West with modern interiors, modular kitchen, and large balconies.',
     highlights: ['Metro connectivity nearby', 'City view', 'Italian marble flooring'],
     amenities: ['Swimming Pool', 'Gymnasium', 'Clubhouse', 'Lift', 'Power Backup'],
     assignedPartner: {
@@ -97,7 +97,7 @@ const STATUS_STYLES = {
 }
 
 const TYPE_STYLES = {
-  Apartment: 'bg-primary-50 text-primary-700',
+  Building: 'bg-primary-50 text-primary-700',
   Villa: 'bg-purple-50 text-purple-700',
   Commercial: 'bg-cyan-50 text-cyan-700',
   Plot: 'bg-lime-50 text-lime-700',
@@ -109,6 +109,31 @@ function formatPrice(v) {
   if (v >= 10000000) return `INR ${(v / 10000000).toFixed(2)} Cr`
   if (v >= 100000) return `INR ${(v / 100000).toFixed(1)} L`
   return `INR ${v.toLocaleString('en-IN')}`
+}
+
+function amenityIcon(name) {
+  const n = name.toLowerCase()
+  if (n.includes('pool')) return '🏊'
+  if (n.includes('gym')) return '🏋️'
+  if (n.includes('club')) return '🏛️'
+  if (n.includes('indoor game')) return '🎮'
+  if (n.includes('outdoor sport')) return '🏸'
+  if (n.includes('jogging') || n.includes('track')) return '🏃'
+  if (n.includes('play')) return '🧒'
+  if (n.includes('multipurpose') || n.includes('hall')) return '🏢'
+  if (n.includes('power backup')) return '🔋'
+  if (n.includes('lift')) return '🛗'
+  if (n.includes('cctv') || n.includes('security')) return '🛡️'
+  if (n.includes('parking')) return '🅿️'
+  if (n.includes('ev charg')) return '🔌'
+  if (n.includes('garden') || n.includes('landscape')) return '🌳'
+  if (n.includes('temple')) return '🛕'
+  if (n.includes('market')) return '🛒'
+  if (n.includes('pharmacy')) return '💊'
+  if (n.includes('basketball')) return '🏀'
+  if (n.includes('tennis')) return '🎾'
+  if (n.includes('yoga')) return '🧘'
+  return '✨'
 }
 
 function Icon({ d, cls = 'w-4 h-4' }) {
@@ -332,7 +357,7 @@ function OverviewTab({ p }) {
           <div className="flex flex-wrap gap-2">
             {p.amenities.map((a) => (
               <span key={a} className="text-xs px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full border border-primary-100 font-medium">
-                {a}
+                {amenityIcon(a)} {a}
               </span>
             ))}
           </div>

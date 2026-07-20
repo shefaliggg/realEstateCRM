@@ -47,6 +47,7 @@ const leadSchema = new mongoose.Schema(
     budget: { type: Number },                                       // INR
     requirements: String,
     city: String,
+    project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
     // Units the lead has shown interest in
     unitInterest: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Unit' }],
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
