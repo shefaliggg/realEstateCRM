@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const towerSchema = new mongoose.Schema(
   {
+    builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder', required: true, index: true },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, trim: true },

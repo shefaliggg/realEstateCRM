@@ -10,17 +10,18 @@ const {
 	resendInvite,
 	revokeInvite,
 } = require('../controllers/userController');
-const { protect, adminOnly } = require('../middleware/authMiddleware');
+const { protect, requirePermission } = require('../middleware/authMiddleware');
+const { attachTenantScope, requireBuilderScope } = require('../middleware/tenantMiddleware');
 
-router.use(protect);
+router.use(protect, attachTenantScope, requireBuilderScope, requirePermission('manage_users'));
 
-router.get('/', adminOnly, getUsers);
-router.post('/', adminOnly, createUser);
-router.get('/invites/pending', adminOnly, getPendingInvites);
-router.post('/:id/resend-invite', adminOnly, resendInvite);
-router.post('/:id/revoke-invite', adminOnly, revokeInvite);
-router.get('/:id', adminOnly, getUserById);
-router.put('/:id', adminOnly, updateUser);
-router.delete('/:id', adminOnly, deleteUser);
+router.get('/', getUsers);
+router.post('/', createUser);
+router.get('/invites/pending', getPendingInvites);
+router.post('/:id/resend-invite', resendInvite);
+router.post('/:id/revoke-invite', revokeInvite);
+router.get('/:id', getUserById);
+router.put('/:id', updateUser);
+router.delete('/:id', deleteUser);
 
 module.exports = router;

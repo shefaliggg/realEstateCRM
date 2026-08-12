@@ -13,7 +13,7 @@ const formatVisitDate = (value) => {
 
 const getLeads = async (req, res) => {
   try {
-    const filter = {}
+    const filter = { builderId: req.builderId }
     if (req.query.nurtureStage) filter.nurtureStage = req.query.nurtureStage
     if (req.query.source) filter.source = req.query.source
     if (req.query.assignedTo) filter.assignedTo = req.query.assignedTo
@@ -31,7 +31,7 @@ const getLeads = async (req, res) => {
 
 const getLeadById = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id)
+    const lead = await Lead.findOne({ _id: req.params.id, builderId: req.builderId })
       .populate('assignedTo', 'name email')
       .populate({
         path: 'unitInterest',
@@ -47,7 +47,7 @@ const getLeadById = async (req, res) => {
 
 const createLead = async (req, res) => {
   try {
-    const lead = new Lead({ ...req.body, createdBy: req.user._id })
+    const lead = new Lead({ ...req.body, createdBy: req.user._id, builderId: req.builderId })
     await lead.save()
     res.status(201).json(lead)
   } catch (err) {
@@ -57,7 +57,7 @@ const createLead = async (req, res) => {
 
 const updateLead = async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, {
+    const lead = await Lead.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, req.body, {
       new: true,
       runValidators: true,
     })
@@ -72,7 +72,7 @@ const updateLead = async (req, res) => {
 
 const deleteLead = async (req, res) => {
   try {
-    const lead = await Lead.findByIdAndDelete(req.params.id)
+    const lead = await Lead.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!lead) return res.status(404).json({ message: 'Lead not found' })
     res.json({ message: 'Lead deleted' })
   } catch (err) {
@@ -84,7 +84,7 @@ const addNote = async (req, res) => {
   try {
     const { text } = req.body
     if (!text) return res.status(400).json({ message: 'Note text is required' })
-    const lead = await Lead.findById(req.params.id)
+    const lead = await Lead.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!lead) return res.status(404).json({ message: 'Lead not found' })
     lead.notes.push({ text, author: req.user._id, authorName: req.user.name })
     await lead.save()
@@ -96,7 +96,7 @@ const addNote = async (req, res) => {
 
 const addTask = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id)
+    const lead = await Lead.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!lead) return res.status(404).json({ message: 'Lead not found' })
     const taskPayload = { ...req.body, createdBy: req.user._id }
     lead.followUpTasks.push(taskPayload)
@@ -135,7 +135,7 @@ const addTask = async (req, res) => {
 
 const completeTask = async (req, res) => {
   try {
-    const lead = await Lead.findById(req.params.id)
+    const lead = await Lead.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!lead) return res.status(404).json({ message: 'Lead not found' })
     const task = lead.followUpTasks.id(req.params.taskId)
     if (!task) return res.status(404).json({ message: 'Task not found' })

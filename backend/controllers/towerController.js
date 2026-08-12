@@ -46,9 +46,9 @@ const buildPayload = (body, files = {}) => {
   return payload
 }
 
-const withUnitStats = async (towers) => {
+const withUnitStats = async (towers, builderId) => {
   const projectIds = [...new Set(towers.map((t) => String(t.project?._id || t.project)))]
-  const units = await Unit.find({ project: { $in: projectIds } })
+  const units = await Unit.find({ project: { $in: projectIds }, builderId })
   return towers.map((t) => {
     const towerUnits = units.filter((u) => u.block === t.name && String(u.project) === String(t.project?._id || t.project))
     return {
@@ -66,14 +66,14 @@ const withUnitStats = async (towers) => {
 
 const getTowers = async (req, res) => {
   try {
-    const filter = {}
+    const filter = { builderId: req.builderId }
     if (req.params.projectId) filter.project = req.params.projectId
     else if (req.query.project) filter.project = req.query.project
     const towers = await Tower.find(filter)
       .populate('siteEngineer', 'name email')
       .populate('salesManager', 'name email')
       .sort({ name: 1 })
-    res.json(await withUnitStats(towers))
+    res.json(await withUnitStats(towers, req.builderId))
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
@@ -81,12 +81,12 @@ const getTowers = async (req, res) => {
 
 const getTowerById = async (req, res) => {
   try {
-    const tower = await Tower.findById(req.params.id)
+    const tower = await Tower.findOne({ _id: req.params.id, builderId: req.builderId })
       .populate('project', 'name')
       .populate('siteEngineer', 'name email phone')
       .populate('salesManager', 'name email phone')
     if (!tower) return res.status(404).json({ message: 'Tower not found' })
-    const [withStats] = await withUnitStats([tower])
+    const [withStats] = await withUnitStats([tower], req.builderId)
     res.json(withStats)
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -98,11 +98,13 @@ const createTower = async (req, res) => {
     const payload = buildPayload(req.body, req.files || {})
     if (!payload.name) return res.status(400).json({ message: 'Tower name is required' })
 
-    const tower = new Tower({ ...payload, project: req.params.projectId, createdBy: req.user._id })
+    const project = await Project.findOne({ _id: req.params.projectId, builderId: req.builderId })
+    if (!project) return res.status(404).json({ message: 'Project not found' })
+
+    const tower = new Tower({ ...payload, project: req.params.projectId, builderId: req.builderId, createdBy: req.user._id })
     await tower.save()
 
-    const project = await Project.findById(req.params.projectId)
-    if (project && !(project.blocks || []).some((b) => b.toLowerCase() === tower.name.toLowerCase())) {
+    if (!(project.blocks || []).some((b) => b.toLowerCase() === tower.name.toLowerCase())) {
       project.blocks = [...(project.blocks || []), tower.name]
       await project.save()
     }
@@ -117,7 +119,7 @@ const createTower = async (req, res) => {
 const updateTower = async (req, res) => {
   try {
     const payload = buildPayload(req.body, req.files || {})
-    const tower = await Tower.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true })
+    const tower = await Tower.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, payload, { new: true, runValidators: true })
     if (!tower) return res.status(404).json({ message: 'Tower not found' })
     res.json(tower)
   } catch (err) {
@@ -127,7 +129,7 @@ const updateTower = async (req, res) => {
 
 const deleteTower = async (req, res) => {
   try {
-    const tower = await Tower.findByIdAndDelete(req.params.id)
+    const tower = await Tower.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!tower) return res.status(404).json({ message: 'Tower not found' })
     res.json({ message: 'Tower deleted' })
   } catch (err) {

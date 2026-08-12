@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 
 function toDateKey(date) {
@@ -14,6 +14,9 @@ function monthLabel(date) {
 }
 
 export default function SiteVisitCalendarPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const projectFilter = searchParams.get('project') || ''
+  const [projectName, setProjectName] = useState('')
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -24,11 +27,23 @@ export default function SiteVisitCalendarPage() {
   const [selectedKey, setSelectedKey] = useState(() => toDateKey(new Date()))
 
   useEffect(() => {
-    api.get('/leads')
+    setLoading(true)
+    api.get(projectFilter ? `/leads?project=${projectFilter}` : '/leads')
       .then((res) => setLeads(res.data || []))
       .catch(() => setError('Failed to load visit calendar'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [projectFilter])
+
+  useEffect(() => {
+    if (!projectFilter) { setProjectName(''); return }
+    api.get(`/projects/${projectFilter}`).then((r) => setProjectName(r.data?.name || '')).catch(() => {})
+  }, [projectFilter])
+
+  const clearProjectFilter = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('project')
+    setSearchParams(next)
+  }
 
   const visits = useMemo(() => {
     const rows = []
@@ -93,6 +108,13 @@ export default function SiteVisitCalendarPage() {
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">{error}</div>}
+
+      {projectFilter && (
+        <div className="flex items-center gap-2 bg-primary-50 border border-primary-100 text-primary-700 rounded-lg px-4 py-2.5 text-sm">
+          <span>Filtered by project{projectName ? `: ${projectName}` : ''}</span>
+          <button onClick={clearProjectFilter} className="ml-auto text-xs font-medium underline hover:text-primary-800">Clear filter</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-4 sm:p-5">

@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/axios'
-import { getPartnerLeadLinks, getPartners, savePartnerLeadLinks } from '../utils/channelPartnerStore'
+import { getChannelPartners } from '../api/channelPartnerApi'
 
 const PARTNER_SOURCES = ['Referral', 'Direct']
 
 export default function PartnerLeadsPage() {
   const [leads, setLeads] = useState([])
-  const [partners] = useState(getPartners())
-  const [links, setLinks] = useState(getPartnerLeadLinks())
+  const [partners, setPartners] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [stageFilter, setStageFilter] = useState('All')
 
   useEffect(() => {
-    api.get('/leads')
-      .then((r) => setLeads(r.data || []))
+    Promise.all([api.get('/leads'), getChannelPartners()])
+      .then(([leadsRes, partnersRes]) => {
+        setLeads(leadsRes.data || [])
+        setPartners(partnersRes || [])
+      })
       .catch(() => setError('Failed to load leads'))
       .finally(() => setLoading(false))
   }, [])
@@ -25,15 +27,14 @@ export default function PartnerLeadsPage() {
     return leads
       .filter((l) => PARTNER_SOURCES.includes(l.source))
       .map((l) => {
-        const link = links.find((x) => x.leadId === l._id)
-        const partner = partners.find((p) => p.id === link?.partnerId)
+        const partner = partners.find((p) => p._id === l.channelPartner)
         return {
           ...l,
-          partnerId: link?.partnerId || '',
+          partnerId: l.channelPartner || '',
           partnerName: partner?.name || 'Unassigned',
         }
       })
-  }, [leads, links, partners])
+  }, [leads, partners])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -61,11 +62,9 @@ export default function PartnerLeadsPage() {
     convertedLike: mappedLeads.filter((l) => (l.nurtureStage || '').toLowerCase().includes('interested')).length,
   }
 
-  const assignPartner = (leadId, partnerId) => {
-    const rest = links.filter((x) => x.leadId !== leadId)
-    const next = partnerId ? [...rest, { leadId, partnerId }] : rest
-    setLinks(next)
-    savePartnerLeadLinks(next)
+  const assignPartner = async (leadId, partnerId) => {
+    const { data } = await api.put(`/leads/${leadId}`, { channelPartner: partnerId || null })
+    setLeads((prev) => prev.map((l) => (l._id === leadId ? data : l)))
   }
 
   return (
@@ -148,7 +147,7 @@ export default function PartnerLeadsPage() {
                       >
                         <option value="">Unassigned</option>
                         {partners.filter((p) => p.active).map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
+                          <option key={p._id} value={p._id}>{p.name}</option>
                         ))}
                       </select>
                     </td>

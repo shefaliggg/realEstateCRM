@@ -1,153 +1,9 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { getRoleModulePermissions } from '../utils/rolePermissions'
-
-const NAV = [
-  {
-    group: null,
-    items: [{ label: 'Dashboard', icon: 'home', path: '/dashboard' }],
-  },
-  {
-    group: 'CORE',
-    items: [
-      {
-        label: 'Projects', icon: 'building', sub: [
-          { label: 'Buildings', path: '/projects/types/buildings' },
-          { label: 'Villas', path: '/projects/types/villas' },
-          { label: 'Plots', path: '/projects/types/plots' },
-          { label: 'Commercial', path: '/projects/types/commercial' },
-          { label: 'Mixed Use', path: '/projects/types/mixed-use' },
-          { label: 'Inventory', path: '/inventory' },
-        ],
-      },
-      {
-        label: 'Leads', icon: 'users', sub: [
-          { label: 'All Leads', path: '/leads' },
-          { label: 'Nurture Board', path: '/leads/nurture' },
-          { label: 'My Leads', path: '/leads/mine' },
-          { label: 'Lead Sources', path: '/leads/sources' },
-        ],
-      },
-      {
-        label: 'Deals', icon: 'deal', sub: [
-          { label: 'All Deals', path: '/deals' },
-          { label: 'Pipeline', path: '/deals/pipeline' },
-          { label: 'My Deals', path: '/deals/mine' },
-        ],
-      },
-      {
-        label: 'Site Visits', icon: 'calendar', sub: [
-          { label: 'Schedule Visit', path: '/visits/schedule' },
-          { label: 'Calendar', path: '/visits/calendar' },
-        ],
-      },
-      {
-        label: 'Channel Partners', icon: 'handshake', sub: [
-          { label: 'All Partners', path: '/partners' },
-          { label: 'Partner Leads', path: '/partners/leads' },
-          { label: 'Payouts', path: '/partners/payouts' },
-        ],
-      },
-      {
-        label: 'Post-Sales', icon: 'receipt', sub: [
-          { label: 'Customers', path: '/post-sales/customers' },
-          { label: 'Bookings', path: '/post-sales/bookings' },
-          { label: 'Payment Schedules', path: '/post-sales/payment-schedules' },
-          { label: 'Payments', path: '/post-sales/payments' },
-          { label: 'Documents', path: '/post-sales/documents' },
-          { label: 'Referrals', path: '/post-sales/referrals' },
-        ],
-      },
-      {
-        label: 'Users & Roles', icon: 'user', adminOnly: true, sub: [
-          { label: 'Manage Users', path: '/users' },
-          { label: 'Permissions', path: '/permissions' },
-        ],
-      },
-      {
-        label: 'Reports', icon: 'report', sub: [
-          { label: 'Sales Reports', path: '/reports/sales' },
-          { label: 'Marketing Reports', path: '/reports/marketing' },
-          { label: 'Performance Reports', path: '/reports/performance' },
-        ],
-      },
-    ],
-  },
-  {
-    group: 'MARKETING',
-    items: [
-      {
-        label: 'Campaigns', icon: 'chart', sub: [
-          { label: 'All Campaigns', path: '/marketing/campaigns' },
-          { label: 'Create Campaign', path: '/marketing/campaigns/create' },
-        ],
-      },
-      {
-        label: 'Lead Generation', icon: 'target', sub: [
-          { label: 'Lead Lists', path: '/marketing/lead-generation/lists' },
-          { label: 'Google Maps Leads', path: '/marketing/lead-generation/google-maps' },
-          { label: 'Import Leads', path: '/marketing/lead-generation/import' },
-        ],
-      },
-      {
-        label: 'Settings', icon: 'user', sub: [
-          { label: 'Company Knowledge', path: '/marketing/settings/company-knowledge' },
-        ],
-      },
-      {
-        label: 'Email Marketing', icon: 'email', sub: [
-          { label: 'Campaigns', path: '/marketing/email' },
-          { label: 'Settings', path: '/marketing/email/settings' },
-          { label: 'Templates', path: '/marketing/email/templates' },
-        ],
-      },
-      {
-        label: 'WhatsApp Marketing', icon: 'whatsapp', sub: [
-          { label: 'Broadcasts', path: '/marketing/whatsapp' },
-          { label: 'Templates', path: '/marketing/whatsapp/templates' },
-        ],
-      },
-      {
-        label: 'SMS Marketing', icon: 'sms', sub: [
-          { label: 'Campaigns', path: '/marketing/sms' },
-        ],
-      },
-      {
-        label: 'Social Media', icon: 'globe', sub: [
-          { label: 'All Posts', path: '/marketing/social' },
-          { label: 'Create Post', path: '/marketing/social/create' },
-          { label: 'Scheduler', path: '/marketing/social/scheduler' },
-        ],
-      },
-      {
-        label: 'Content & SEO', icon: 'pencil', sub: [
-          { label: 'Blogs', path: '/marketing/content' },
-          { label: 'Drafts', path: '/marketing/content/drafts' },
-        ],
-      },
-      {
-        label: 'Paid Ads', icon: 'target', sub: [
-          { label: 'Campaigns', path: '/marketing/ads' },
-          { label: 'Performance', path: '/marketing/ads/performance' },
-        ],
-      },
-      {
-        label: 'AI Calling', icon: 'phone', sub: [
-          { label: 'Call Campaigns', path: '/marketing/calling' },
-          { label: 'Call Logs', path: '/marketing/calling/logs' },
-        ],
-      },
-      {
-        label: 'Marketing Analytics', icon: 'analytics', sub: [
-          { label: 'Overview', path: '/marketing/analytics' },
-          { label: 'Channel Performance', path: '/marketing/analytics/channels' },
-          { label: 'CPL / ROI', path: '/marketing/analytics/roi' },
-        ],
-      },
-    ],
-  },
-]
+import { hasModuleAccess } from '../utils/rolePermissions'
+import { getNavForProduct, SETTINGS_NAV_ITEM } from '../config/nav'
+import { getAvailableProducts, getProductForPath } from '../config/products'
 
 const ICONS = {
   home: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />,
@@ -178,53 +34,54 @@ function NavIcon({ name }) {
   )
 }
 
-function getInitialOpen(pathname) {
+function getInitialOpen(nav, pathname) {
   const open = new Set()
-  for (const { items } of NAV) {
-    for (const item of items) {
-      if (item.sub?.some((s) => pathname === s.path || pathname.startsWith(s.path + '/'))) {
-        open.add(item.label)
-      }
+  for (const item of nav) {
+    if (item.sub?.some((s) => pathname === s.path || pathname.startsWith(s.path + '/'))) {
+      open.add(item.label)
     }
   }
   return open
 }
 
-function getSectionOpen(pathname) {
-  for (const { group, items } of NAV) {
-    if (!group) continue
-    for (const item of items) {
-      const paths = item.sub ? item.sub.map((s) => s.path) : item.path ? [item.path] : []
-      if (paths.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
-        return { CORE: group === 'CORE', MARKETING: group === 'MARKETING' }
-      }
-    }
-  }
-  // Dashboard or unknown — keep both collapsed
-  return { CORE: false, MARKETING: false }
-}
-
 export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(() => getInitialOpen(location.pathname))
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [sectionOpen, setSectionOpen] = useState(() => getSectionOpen(location.pathname))
-  const [, setPermissionsVersion] = useState(0)
-
-  const { user: authUser } = useAuth()
+  const { user: authUser, selectBuilder, getMyMemberships } = useAuth()
   const user = userProp ?? authUser
-  const roleModulePermissions = getRoleModulePermissions(user?.role)
+
+  const activeProduct = getProductForPath(location.pathname)
+  const nav = getNavForProduct(activeProduct.id)
+  const availableProducts = getAvailableProducts(user?.role)
+
+  const [open, setOpen] = useState(() => getInitialOpen(nav, location.pathname))
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [memberships, setMemberships] = useState(null)
+  const [switchingOrgId, setSwitchingOrgId] = useState(null)
 
   useEffect(() => {
-    const syncPermissions = () => setPermissionsVersion((v) => v + 1)
-    window.addEventListener('role-permissions-updated', syncPermissions)
-    return () => window.removeEventListener('role-permissions-updated', syncPermissions)
-  }, [])
+    setOpen(getInitialOpen(nav, location.pathname))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProduct.id])
 
   useEffect(() => {
-    setSectionOpen(getSectionOpen(location.pathname))
-  }, [location.pathname])
+    getMyMemberships()
+      .then(setMemberships)
+      .catch(() => setMemberships([]))
+  }, [getMyMemberships])
+
+  const handleSwitchOrg = async (builderId) => {
+    if (builderId === user?.builderId) return
+    setSwitchingOrgId(builderId)
+    try {
+      await selectBuilder(builderId)
+      setUserMenuOpen(false)
+      navigate('/dashboard')
+    } finally {
+      setSwitchingOrgId(null)
+    }
+  }
 
   function handleLogout() {
     setUserMenuOpen(false)
@@ -246,13 +103,6 @@ export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout 
       return next
     })
 
-  const toggleSection = (group) => {
-    setSectionOpen((prev) => ({
-      ...prev,
-      [group]: !prev[group],
-    }))
-  }
-
   const isActive = (path) => location.pathname === path
 
   return (
@@ -267,107 +117,183 @@ export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout 
           ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:z-auto
         `}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-gray-200 shrink-0">
-          <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
-            </svg>
-          </div>
-          <p className="text-gray-900 text-sm font-bold">PropVault</p>
+        {/* Logo + product switcher */}
+        <div className="relative border-b border-gray-200 shrink-0">
+          <button
+            onClick={() => availableProducts.length > 1 && setSwitcherOpen((v) => !v)}
+            className={`w-full flex items-center gap-2.5 px-4 h-14 ${availableProducts.length > 1 ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'}`}
+          >
+            <div className="w-7 h-7 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
+              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 9.5L12 3l9 6.5V21H3V9.5z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-gray-900 text-sm font-bold leading-tight">PropVault</p>
+              <p className="text-[10px] text-gray-400 leading-tight truncate">{activeProduct.label}</p>
+            </div>
+            {availableProducts.length > 1 && (
+              <svg
+                className={`w-3.5 h-3.5 text-gray-400 transition-transform shrink-0 ${switcherOpen ? 'rotate-180' : ''}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            )}
+          </button>
+
+          {switcherOpen && availableProducts.length > 1 && (
+            <div className="absolute left-2 right-2 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-40 py-1">
+              {availableProducts.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setSwitcherOpen(false)
+                    onClose?.()
+                    navigate(p.homePath)
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm transition ${
+                    p.id === activeProduct.id ? 'text-primary-700 font-semibold bg-primary-50' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-2 sidebar-scroll">
-          {NAV.map(({ group, items }) => (
-            <div
-              key={group ?? '_root'}
-              className={
-                group === 'CORE'
-                  ? 'mt-2 bg-sky-50/60 border-y border-sky-100'
-                  : group === 'MARKETING'
-                    ? 'mt-3 bg-emerald-50/60 border-y border-emerald-100'
-                    : ''
-              }
-            >
-              {group && (
-                <button
-                  onClick={() => toggleSection(group)}
-                  className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between text-[9px] font-bold tracking-[0.12em] text-gray-400 uppercase hover:text-gray-600 transition"
+          {nav
+            .filter((item) =>
+              // The channel-partner and customer tiers aren't governed by the
+              // module permission system (see backend/utils/permissions.js
+              // MANAGED_ROLE_KEYS) — their portal nav is never toggle-gated.
+              activeProduct.id === 'partner' ||
+              activeProduct.id === 'customer' ||
+              user?.role === 'builder_admin' ||
+              hasModuleAccess(user?.permissions, item.label)
+            )
+            .map((item) =>
+              item.path ? (
+                <Link
+                  key={item.label}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
+                    ${isActive(item.path)
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                 >
-                  <span>{group}</span>
-                  <svg
-                    className={`w-3 h-3 transition-transform ${sectionOpen[group] ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              )}
-              {(!group || sectionOpen[group]) && items
-                .filter((item) => (!item.adminOnly || user?.role === 'admin') && (roleModulePermissions[item.label] ?? true))
-                .map((item) =>
-                item.path ? (
-                  <Link
-                    key={item.label}
-                    to={item.path}
-                    onClick={onClose}
+                  <NavIcon name={item.icon} />
+                  {item.label}
+                </Link>
+              ) : (
+                <div key={item.label}>
+                  <button
+                    onClick={() => toggle(item.label)}
+                    style={{ width: 'calc(100% - 16px)' }}
                     className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
-                      ${isActive(item.path)
-                        ? 'bg-primary-50 text-primary-700'
+                      ${open.has(item.label) || item.sub?.some((s) => isActive(s.path))
+                        ? 'text-primary-700 bg-primary-50/60'
                         : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
                   >
                     <NavIcon name={item.icon} />
-                    {item.label}
-                  </Link>
-                ) : (
-                  <div key={item.label}>
-                    <button
-                      onClick={() => toggle(item.label)}
-                      style={{ width: 'calc(100% - 16px)' }}
-                      className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
-                        ${open.has(item.label) || item.sub?.some((s) => isActive(s.path))
-                          ? 'text-primary-700 bg-primary-50/60'
-                          : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
+                    <span className="flex-1 text-left">{item.label}</span>
+                    <svg
+                      className={`w-3 h-3 transition-transform shrink-0 ${open.has(item.label) ? 'rotate-180 text-primary-500' : 'text-gray-400'}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      <NavIcon name={item.icon} />
-                      <span className="flex-1 text-left">{item.label}</span>
-                      <svg
-                        className={`w-3 h-3 transition-transform shrink-0 ${open.has(item.label) ? 'rotate-180 text-primary-500' : 'text-gray-400'}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                    {open.has(item.label) && (
-                      <div className="ml-9 mr-2 mb-1">
-                        {item.sub.map((child) => (
-                          <Link
-                            key={child.label}
-                            to={child.path}
-                            onClick={onClose}
-                            className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-all
-                              ${isActive(child.path)
-                                ? 'text-primary-700 font-semibold bg-primary-50'
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
-                          >
-                            <span
-                              className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`}
-                            />
-                            {child.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {open.has(item.label) && (
+                    <div className="ml-9 mr-2 mb-1">
+                      {item.sub.map((child) => (
+                        <Link
+                          key={child.label}
+                          to={child.path}
+                          onClick={onClose}
+                          className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-all
+                            ${isActive(child.path)
+                              ? 'text-primary-700 font-semibold bg-primary-50'
+                              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
+                        >
+                          <span
+                            className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`}
+                          />
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+
+          {activeProduct.id === 'crm' && (
+            <>
+              <div className="h-px bg-gray-200 mx-3 my-2" />
+              {user?.role === 'builder_admin' ? (
+                <div>
+                  <button
+                    onClick={() => toggle(SETTINGS_NAV_ITEM.label)}
+                    style={{ width: 'calc(100% - 16px)' }}
+                    className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
+                      ${open.has(SETTINGS_NAV_ITEM.label) || SETTINGS_NAV_ITEM.sub.some((s) => isActive(s.path))
+                        ? 'text-primary-700 bg-primary-50/60'
+                        : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
+                  >
+                    <NavIcon name={SETTINGS_NAV_ITEM.icon} />
+                    <span className="flex-1 text-left">{SETTINGS_NAV_ITEM.label}</span>
+                    <svg
+                      className={`w-3 h-3 transition-transform shrink-0 ${open.has(SETTINGS_NAV_ITEM.label) ? 'rotate-180 text-primary-500' : 'text-gray-400'}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {open.has(SETTINGS_NAV_ITEM.label) && (
+                    <div className="ml-9 mr-2 mb-1">
+                      {SETTINGS_NAV_ITEM.sub.map((child) => (
+                        <Link
+                          key={child.label}
+                          to={child.path}
+                          onClick={onClose}
+                          className={`flex items-center gap-2 py-1.5 px-2 rounded-md text-xs transition-all
+                            ${isActive(child.path)
+                              ? 'text-primary-700 font-semibold bg-primary-50'
+                              : 'text-gray-500 hover:text-gray-900 hover:bg-gray-200'}`}
+                        >
+                          <span
+                            className={`w-1 h-1 rounded-full shrink-0 ${isActive(child.path) ? 'bg-primary-600' : 'bg-gray-300'}`}
+                          />
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  to="/settings"
+                  onClick={onClose}
+                  className={`flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm font-medium transition-all
+                    ${isActive('/settings')
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'}`}
+                >
+                  <NavIcon name="user" />
+                  Settings
+                </Link>
               )}
-            </div>
-          ))}
+            </>
+          )}
         </nav>
 
         <div className="relative border-t border-gray-200 p-3 shrink-0 bg-white/70">
@@ -380,7 +306,7 @@ export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout 
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="text-xs font-semibold text-gray-800 truncate">{user?.name ?? 'Admin'}</p>
-              <p className="text-[11px] text-gray-500 capitalize truncate">{user?.role ?? 'admin'}</p>
+              <p className="text-[11px] text-gray-500 capitalize truncate">{user?.role?.replace(/_/g, ' ') ?? 'builder admin'}</p>
             </div>
             <svg
               className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-90' : ''}`}
@@ -393,7 +319,29 @@ export default function Sidebar({ mobileOpen, onClose, user: userProp, onLogout 
           </button>
 
           {userMenuOpen && (
-            <div className="absolute left-full ml-2 bottom-3 w-44 bg-white border border-gray-200 rounded-lg shadow-lg z-40">
+            <div className="absolute left-full ml-2 bottom-3 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-40">
+              {memberships?.length > 1 && (
+                <>
+                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                    Switch Organization
+                  </p>
+                  {memberships.map((m) => (
+                    <button
+                      key={m.membershipId}
+                      onClick={() => handleSwitchOrg(m.builderId)}
+                      disabled={switchingOrgId === m.builderId}
+                      className={`w-full text-left px-3 py-2 text-sm transition ${
+                        m.builderId === user?.builderId
+                          ? 'text-primary-700 font-semibold bg-primary-50'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {m.builderName}
+                    </button>
+                  ))}
+                  <div className="h-px bg-gray-200" />
+                </>
+              )}
               <Link
                 to="/profile"
                 onClick={() => {

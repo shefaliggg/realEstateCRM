@@ -1,9 +1,12 @@
 const express = require('express')
 const router = express.Router()
-const { protect } = require('../middleware/authMiddleware')
+const { protect, blockExternalUsers, requirePermission } = require('../middleware/authMiddleware')
+const { attachTenantScope, requireBuilderScope } = require('../middleware/tenantMiddleware')
 const { getBookings, getBookingById, createBooking, updateBooking, deleteBooking } = require('../controllers/bookingController')
 
-router.route('/').get(protect, getBookings).post(protect, createBooking)
-router.route('/:id').get(protect, getBookingById).put(protect, updateBooking).delete(protect, deleteBooking)
+router.use(protect, attachTenantScope, requireBuilderScope, blockExternalUsers, requirePermission('module:Post-Sales'))
+
+router.route('/').get(getBookings).post(createBooking)
+router.route('/:id').get(getBookingById).put(updateBooking).delete(deleteBooking)
 
 module.exports = router

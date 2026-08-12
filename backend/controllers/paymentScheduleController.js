@@ -1,4 +1,5 @@
 const PaymentSchedule = require('../models/PaymentSchedule')
+const Booking = require('../models/Booking')
 
 const withEffectiveStatus = (schedule) => {
   const obj = schedule.toObject ? schedule.toObject() : schedule
@@ -10,7 +11,7 @@ const withEffectiveStatus = (schedule) => {
 
 const getSchedules = async (req, res) => {
   try {
-    const filter = {}
+    const filter = { builderId: req.builderId }
     if (req.query.project) filter.project = req.query.project
     if (req.query.booking) filter.booking = req.query.booking
     const schedules = await PaymentSchedule.find(filter)
@@ -27,7 +28,10 @@ const getSchedules = async (req, res) => {
 
 const createSchedule = async (req, res) => {
   try {
-    const schedule = new PaymentSchedule(req.body)
+    const booking = await Booking.findOne({ _id: req.body.booking, builderId: req.builderId })
+    if (!booking) return res.status(404).json({ message: 'Booking not found' })
+
+    const schedule = new PaymentSchedule({ ...req.body, builderId: req.builderId })
     await schedule.save()
     res.status(201).json(schedule)
   } catch (err) {
@@ -37,10 +41,11 @@ const createSchedule = async (req, res) => {
 
 const updateSchedule = async (req, res) => {
   try {
-    const schedule = await PaymentSchedule.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    })
+    const schedule = await PaymentSchedule.findOneAndUpdate(
+      { _id: req.params.id, builderId: req.builderId },
+      req.body,
+      { new: true, runValidators: true }
+    )
     if (!schedule) return res.status(404).json({ message: 'Schedule not found' })
     res.json(schedule)
   } catch (err) {
@@ -50,7 +55,7 @@ const updateSchedule = async (req, res) => {
 
 const deleteSchedule = async (req, res) => {
   try {
-    const schedule = await PaymentSchedule.findByIdAndDelete(req.params.id)
+    const schedule = await PaymentSchedule.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!schedule) return res.status(404).json({ message: 'Schedule not found' })
     res.json({ message: 'Schedule deleted' })
   } catch (err) {

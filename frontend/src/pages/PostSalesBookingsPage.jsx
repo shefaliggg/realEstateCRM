@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { getBookings, saveBookings, getCustomers } from '../utils/postSalesStore'
+import api from '../api/axios'
+import { getBookings, createBooking, updateBooking, getCustomers } from '../api/postSalesApi'
 
 const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
@@ -11,72 +12,123 @@ const STATUS_COLORS = {
 }
 
 function fmt(n) {
-  return '₹' + Number(n).toLocaleString('en-IN')
+  return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
 export default function PostSalesBookingsPage() {
   const [searchParams] = useSearchParams()
   const preCustomer = searchParams.get('customer') || ''
 
-  const [bookings, setBookings] = useState(getBookings)
-  const customers = getCustomers()
+  const [bookings, setBookings] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [projects, setProjects] = useState([])
+  const [units, setUnits] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState(null)
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [customerFilter, setCustomerFilter] = useState(preCustomer)
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({
-    customerId: '', projectName: '', unitNumber: '',
+    customer: '', project: '', unit: '',
     bookingDate: new Date().toISOString().slice(0, 10),
-    totalAmount: '', status: 'Active',
+    totalAmount: '',
   })
 
-  const uniqueProjects = [...new Set(bookings.map((b) => b.projectName))].sort()
+  const projectById = useMemo(() => new Map(projects.map((p) => [p._id, p])), [projects])
+
+  const refresh = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [bookingsData, customersData, projectsRes] = await Promise.all([
+        getBookings(),
+        getCustomers(),
+        api.get('/projects'),
+      ])
+      setBookings(bookingsData)
+      setCustomers(customersData)
+      setProjects(projectsRes.data || [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load bookings')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  useEffect(() => {
+    if (!form.project) {
+      setUnits([])
+      return
+    }
+    api.get(`/projects/${form.project}/units?status=Available`).then((res) => setUnits(res.data || []))
+  }, [form.project])
+
+  const projectName = (booking) => booking.unit?.project?.name || projectById.get(booking.project)?.name || '-'
+  const unitLabel = (booking) => (booking.unit ? `${booking.unit.block || ''} ${booking.unit.unitNo || ''}`.trim() : '-')
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return bookings.filter((b) => {
       if (statusFilter !== 'All' && b.status !== statusFilter) return false
-      if (customerFilter && b.customerId !== customerFilter) return false
+      if (customerFilter && (b.customer?._id || b.customer) !== customerFilter) return false
       if (!q) return true
       return (
-        b.customerName.toLowerCase().includes(q) ||
-        b.projectName.toLowerCase().includes(q) ||
-        b.unitNumber.toLowerCase().includes(q)
+        (b.customer?.name || '').toLowerCase().includes(q) ||
+        projectName(b).toLowerCase().includes(q) ||
+        unitLabel(b).toLowerCase().includes(q)
       )
     })
-  }, [bookings, search, statusFilter, customerFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, search, statusFilter, customerFilter, projectById])
 
-  const totalValue = bookings.reduce((a, b) => a + Number(b.totalAmount), 0)
-  const collectedValue = bookings.reduce((a, b) => a + Number(b.paidAmount), 0)
+  const totalValue = bookings.reduce((a, b) => a + Number(b.totalAmount || 0), 0)
+  const collectedValue = bookings.reduce((a, b) => a + Number(b.paidAmount || 0), 0)
 
-  const addBooking = (e) => {
+  const addBooking = async (e) => {
     e.preventDefault()
-    const cust = customers.find((c) => c.id === form.customerId)
-    if (!cust || !form.projectName || !form.unitNumber || !form.totalAmount) return
-    const next = [
-      {
-        id: `bk-${Date.now()}`,
-        customerId: cust.id,
-        customerName: cust.name,
-        projectName: form.projectName,
-        unitNumber: form.unitNumber,
+    setError('')
+    if (!form.customer || !form.project || !form.unit || !form.totalAmount) {
+      setError('Customer, project, unit and total amount are required')
+      return
+    }
+    setSaving(true)
+    try {
+      await createBooking({
+        customer: form.customer,
+        project: form.project,
+        unit: form.unit,
         bookingDate: form.bookingDate,
         totalAmount: Number(form.totalAmount),
-        paidAmount: 0,
-        status: form.status,
-      },
-      ...bookings,
-    ]
-    setBookings(next)
-    saveBookings(next)
-    setShowAdd(false)
-    setForm({ customerId: '', projectName: '', unitNumber: '', bookingDate: new Date().toISOString().slice(0, 10), totalAmount: '', status: 'Active' })
+      })
+      setShowAdd(false)
+      setForm({ customer: '', project: '', unit: '', bookingDate: new Date().toISOString().slice(0, 10), totalAmount: '' })
+      await refresh()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create booking')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const changeStatus = (id, status) => {
-    const next = bookings.map((b) => (b.id === id ? { ...b, status } : b))
-    setBookings(next)
-    saveBookings(next)
+  const changeStatus = async (id, status) => {
+    setBusyId(id)
+    setError('')
+    try {
+      await updateBooking(id, { status })
+      await refresh()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update booking')
+    } finally {
+      setBusyId(null)
+    }
   }
 
   return (
@@ -94,6 +146,8 @@ export default function PostSalesBookingsPage() {
           + New Booking
         </button>
       </div>
+
+      {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -123,7 +177,7 @@ export default function PostSalesBookingsPage() {
         </select>
         <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}>
           <option value="">All Customers</option>
-          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {customers.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
         </select>
         {(statusFilter !== 'All' || customerFilter || search) && (
           <button
@@ -150,17 +204,20 @@ export default function PostSalesBookingsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 && (
+              {loading && (
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
+              )}
+              {!loading && filtered.length === 0 && (
                 <tr><td colSpan={9} className="px-4 py-10 text-center text-gray-400">No bookings found.</td></tr>
               )}
-              {filtered.map((b) => {
-                const balance = Number(b.totalAmount) - Number(b.paidAmount)
+              {!loading && filtered.map((b) => {
+                const balance = Number(b.totalAmount || 0) - Number(b.paidAmount || 0)
                 return (
-                  <tr key={b.id} className="hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 font-medium text-gray-800">{b.customerName}</td>
-                    <td className="px-4 py-3 text-gray-700">{b.projectName}</td>
-                    <td className="px-4 py-3 text-gray-700">{b.unitNumber}</td>
-                    <td className="px-4 py-3 text-gray-500">{b.bookingDate}</td>
+                  <tr key={b._id} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3 font-medium text-gray-800">{b.customer?.name || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700">{projectName(b)}</td>
+                    <td className="px-4 py-3 text-gray-700">{unitLabel(b)}</td>
+                    <td className="px-4 py-3 text-gray-500">{new Date(b.bookingDate).toLocaleDateString()}</td>
                     <td className="px-4 py-3 text-gray-800 font-medium">{fmt(b.totalAmount)}</td>
                     <td className="px-4 py-3 text-green-700 font-medium">{fmt(b.paidAmount)}</td>
                     <td className="px-4 py-3 text-orange-600 font-medium">{fmt(balance)}</td>
@@ -173,14 +230,16 @@ export default function PostSalesBookingsPage() {
                       {b.status === 'Active' && (
                         <div className="flex gap-2">
                           <button
-                            onClick={() => changeStatus(b.id, 'Completed')}
-                            className="text-xs text-blue-600 hover:underline"
+                            disabled={busyId === b._id}
+                            onClick={() => changeStatus(b._id, 'Completed')}
+                            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
                           >
                             Complete
                           </button>
                           <button
-                            onClick={() => changeStatus(b.id, 'Cancelled')}
-                            className="text-xs text-red-500 hover:underline"
+                            disabled={busyId === b._id}
+                            onClick={() => changeStatus(b._id, 'Cancelled')}
+                            className="text-xs text-red-500 hover:underline disabled:opacity-50"
                           >
                             Cancel
                           </button>
@@ -203,18 +262,24 @@ export default function PostSalesBookingsPage() {
             <form onSubmit={addBooking} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Customer *</label>
-                <select className={inputClass} required value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })}>
+                <select className={inputClass} required value={form.customer} onChange={(e) => setForm({ ...form, customer: e.target.value })}>
                   <option value="">Select customer…</option>
-                  {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {customers.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Project Name *</label>
-                <input className={inputClass} required value={form.projectName} onChange={(e) => setForm({ ...form, projectName: e.target.value })} placeholder="e.g. VMR Azure" />
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Project *</label>
+                <select className={inputClass} required value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value, unit: '' })}>
+                  <option value="">Select project…</option>
+                  {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Unit Number *</label>
-                <input className={inputClass} required value={form.unitNumber} onChange={(e) => setForm({ ...form, unitNumber: e.target.value })} placeholder="e.g. A-401" />
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Unit *</label>
+                <select className={inputClass} required value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} disabled={!form.project}>
+                  <option value="">Select available unit…</option>
+                  {units.map((u) => <option key={u._id} value={u._id}>{u.block} {u.unitNo} — {u.bhkType}</option>)}
+                </select>
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Booking Date</label>
@@ -226,7 +291,9 @@ export default function PostSalesBookingsPage() {
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium">Save</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </form>
           </div>

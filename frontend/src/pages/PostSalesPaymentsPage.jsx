@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { getPayments, savePayments, getBookings, saveBookings, getCustomers } from '../utils/postSalesStore'
+import { useEffect, useMemo, useState } from 'react'
+import api from '../api/axios'
+import { getPayments, createPayment, getBookings, getCustomers } from '../api/postSalesApi'
 
 const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
@@ -11,72 +12,101 @@ const MODE_COLORS = {
 }
 
 function fmt(n) {
-  return '₹' + Number(n).toLocaleString('en-IN')
+  return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
 export default function PostSalesPaymentsPage() {
-  const [payments, setPayments] = useState(getPayments)
-  const bookings = getBookings()
-  const customers = getCustomers()
+  const [payments, setPayments] = useState([])
+  const [bookings, setBookings] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const [customerFilter, setCustomerFilter] = useState('')
   const [modeFilter, setModeFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({
-    bookingId: '', amount: '',
+    booking: '', amount: '',
     date: new Date().toISOString().slice(0, 10),
     mode: 'Online', reference: '', note: '',
   })
 
+  const projectById = useMemo(() => new Map(projects.map((p) => [p._id, p])), [projects])
+
+  const refresh = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [paymentsData, bookingsData, customersData, projectsRes] = await Promise.all([
+        getPayments(),
+        getBookings(),
+        getCustomers(),
+        api.get('/projects'),
+      ])
+      setPayments(paymentsData)
+      setBookings(bookingsData)
+      setCustomers(customersData)
+      setProjects(projectsRes.data || [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load payments')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const bookingLabel = (b) => `${b.customer?.name || 'Unknown'} — ${b.unit?.block || ''} ${b.unit?.unitNo || ''}`.trim()
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return payments.filter((p) => {
-      if (customerFilter) {
-        const bk = bookings.find((b) => b.id === p.bookingId)
-        if (!bk || bk.customerId !== customerFilter) return false
-      }
+      if (customerFilter && (p.booking?.customer?._id || p.booking?.customer) !== customerFilter) return false
       if (modeFilter !== 'All' && p.mode !== modeFilter) return false
       if (!q) return true
       return (
-        p.customerName.toLowerCase().includes(q) ||
-        p.projectName.toLowerCase().includes(q) ||
+        (p.booking?.customer?.name || '').toLowerCase().includes(q) ||
+        (projectById.get(p.project)?.name || '').toLowerCase().includes(q) ||
         (p.reference || '').toLowerCase().includes(q)
       )
     })
-  }, [payments, customerFilter, modeFilter, search, bookings])
+  }, [payments, customerFilter, modeFilter, search, projectById])
 
-  const totalCollected = payments.reduce((a, p) => a + Number(p.amount), 0)
-  const filteredTotal = filtered.reduce((a, p) => a + Number(p.amount), 0)
+  const totalCollected = payments.reduce((a, p) => a + Number(p.amount || 0), 0)
+  const filteredTotal = filtered.reduce((a, p) => a + Number(p.amount || 0), 0)
 
-  const addPayment = (e) => {
+  const addPayment = async (e) => {
     e.preventDefault()
-    const bk = bookings.find((b) => b.id === form.bookingId)
-    if (!bk || !form.amount) return
-    const next = [
-      {
-        id: `pmt-${Date.now()}`,
-        bookingId: bk.id,
-        customerName: bk.customerName,
-        projectName: bk.projectName,
+    setError('')
+    const booking = bookings.find((b) => b._id === form.booking)
+    if (!booking || !form.amount) {
+      setError('Booking and amount are required')
+      return
+    }
+    setSaving(true)
+    try {
+      await createPayment({
+        booking: booking._id,
+        project: booking.project?._id || booking.project,
         amount: Number(form.amount),
         date: form.date,
         mode: form.mode,
-        reference: form.reference,
-        note: form.note,
-      },
-      ...payments,
-    ]
-    // Also update paidAmount in bookings
-    const booksNext = bookings.map((b) =>
-      b.id === form.bookingId ? { ...b, paidAmount: Number(b.paidAmount) + Number(form.amount) } : b,
-    )
-    saveBookings(booksNext)
-
-    setPayments(next)
-    savePayments(next)
-    setShowAdd(false)
-    setForm({ bookingId: '', amount: '', date: new Date().toISOString().slice(0, 10), mode: 'Online', reference: '', note: '' })
+        reference: form.reference || undefined,
+        note: form.note || undefined,
+      })
+      setShowAdd(false)
+      setForm({ booking: '', amount: '', date: new Date().toISOString().slice(0, 10), mode: 'Online', reference: '', note: '' })
+      await refresh()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to record payment')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -95,13 +125,15 @@ export default function PostSalesPaymentsPage() {
         </button>
       </div>
 
+      {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Transactions', value: payments.length, color: 'text-gray-800' },
           { label: 'Total Collected', value: fmt(totalCollected), color: 'text-green-600' },
-          { label: 'Online / NEFT', value: payments.filter((p) => ['Online','NEFT'].includes(p.mode)).length, color: 'text-blue-600' },
-          { label: 'Cheque / Cash', value: payments.filter((p) => ['Cheque','Cash'].includes(p.mode)).length, color: 'text-purple-600' },
+          { label: 'Online / NEFT', value: payments.filter((p) => ['Online', 'NEFT'].includes(p.mode)).length, color: 'text-blue-600' },
+          { label: 'Cheque / Cash', value: payments.filter((p) => ['Cheque', 'Cash'].includes(p.mode)).length, color: 'text-purple-600' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500">{s.label}</p>
@@ -120,10 +152,10 @@ export default function PostSalesPaymentsPage() {
         />
         <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}>
           <option value="">All Customers</option>
-          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {customers.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
         </select>
         <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" value={modeFilter} onChange={(e) => setModeFilter(e.target.value)}>
-          {['All','Online','NEFT','Cheque','Cash'].map((m) => <option key={m}>{m}</option>)}
+          {['All', 'Online', 'NEFT', 'Cheque', 'Cash'].map((m) => <option key={m}>{m}</option>)}
         </select>
         {(customerFilter || modeFilter !== 'All' || search) && (
           <button onClick={() => { setCustomerFilter(''); setModeFilter('All'); setSearch('') }} className="px-3 py-2 text-sm text-red-500 hover:text-red-700">Clear</button>
@@ -143,14 +175,17 @@ export default function PostSalesPaymentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 && (
+              {loading && (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
+              )}
+              {!loading && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No payments found.</td></tr>
               )}
-              {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50 transition">
-                  <td className="px-4 py-3 font-medium text-gray-800">{p.customerName}</td>
-                  <td className="px-4 py-3 text-gray-600">{p.projectName}</td>
-                  <td className="px-4 py-3 text-gray-500">{p.date}</td>
+              {!loading && filtered.map((p) => (
+                <tr key={p._id} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-3 font-medium text-gray-800">{p.booking?.customer?.name || '-'}</td>
+                  <td className="px-4 py-3 text-gray-600">{projectById.get(p.project)?.name || '-'}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(p.date).toLocaleDateString()}</td>
                   <td className="px-4 py-3 font-semibold text-green-700">{fmt(p.amount)}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${MODE_COLORS[p.mode] || 'bg-gray-100 text-gray-700'}`}>
@@ -174,10 +209,10 @@ export default function PostSalesPaymentsPage() {
             <form onSubmit={addPayment} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Booking *</label>
-                <select className={inputClass} required value={form.bookingId} onChange={(e) => setForm({ ...form, bookingId: e.target.value })}>
+                <select className={inputClass} required value={form.booking} onChange={(e) => setForm({ ...form, booking: e.target.value })}>
                   <option value="">Select booking…</option>
                   {bookings.filter((b) => b.status === 'Active').map((b) => (
-                    <option key={b.id} value={b.id}>{b.customerName} — {b.projectName} {b.unitNumber}</option>
+                    <option key={b._id} value={b._id}>{bookingLabel(b)}</option>
                   ))}
                 </select>
               </div>
@@ -192,7 +227,7 @@ export default function PostSalesPaymentsPage() {
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Payment Mode</label>
                 <select className={inputClass} value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
-                  {['Online','NEFT','Cheque','Cash'].map((m) => <option key={m}>{m}</option>)}
+                  {['Online', 'NEFT', 'Cheque', 'Cash'].map((m) => <option key={m}>{m}</option>)}
                 </select>
               </div>
               <div>
@@ -205,7 +240,9 @@ export default function PostSalesPaymentsPage() {
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium">Save</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </form>
           </div>

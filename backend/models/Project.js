@@ -22,6 +22,7 @@ const nearbyLocationSchema = new mongoose.Schema(
 
 const projectSchema = new mongoose.Schema(
   {
+    builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder', required: true, index: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, trim: true },
     developerName: { type: String, trim: true },
@@ -139,6 +140,12 @@ const projectSchema = new mongoose.Schema(
 
     highlights: [{ type: String }],
     managedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    teamDesignations: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        designation: { type: String, trim: true },
+      },
+    ],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

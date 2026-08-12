@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { getPartnerPayouts, getPartners, savePartnerPayouts } from '../utils/channelPartnerStore'
+import { useEffect, useMemo, useState } from 'react'
+import api from '../api/axios'
+import { getChannelPartners } from '../api/channelPartnerApi'
 
 const statusStyle = {
   Pending: 'bg-yellow-100 text-yellow-700',
@@ -8,34 +9,43 @@ const statusStyle = {
 }
 
 export default function PartnerPayoutsPage() {
-  const [partners] = useState(getPartners())
-  const [payouts, setPayouts] = useState(getPartnerPayouts())
+  const [partners, setPartners] = useState([])
+  const [deals, setDeals] = useState([])
+  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('All')
   const [partnerId, setPartnerId] = useState('All')
 
+  useEffect(() => {
+    Promise.all([api.get('/deals?hasPartner=true'), getChannelPartners()])
+      .then(([dealsRes, partnersRes]) => {
+        setDeals(dealsRes.data || [])
+        setPartners(partnersRes || [])
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
   const rows = useMemo(() => {
-    return payouts
-      .map((p) => ({
-        ...p,
-        partnerName: partners.find((x) => x.id === p.partnerId)?.name || 'Unknown Partner',
+    return deals
+      .map((d) => ({
+        ...d,
+        partnerName: partners.find((x) => x._id === d.channelPartner)?.name || 'Unknown Partner',
       }))
-      .filter((p) => (status === 'All' ? true : p.status === status))
-      .filter((p) => (partnerId === 'All' ? true : p.partnerId === partnerId))
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-  }, [payouts, partners, status, partnerId])
+      .filter((d) => (status === 'All' ? true : d.commissionStatus === status))
+      .filter((d) => (partnerId === 'All' ? true : d.channelPartner === partnerId))
+      .sort((a, b) => new Date(a.commissionDueDate || 0) - new Date(b.commissionDueDate || 0))
+  }, [deals, partners, status, partnerId])
 
   const stats = {
-    total: payouts.reduce((a, p) => a + p.amount, 0),
-    pending: payouts.filter((p) => p.status === 'Pending').reduce((a, p) => a + p.amount, 0),
-    processing: payouts.filter((p) => p.status === 'Processing').reduce((a, p) => a + p.amount, 0),
-    paid: payouts.filter((p) => p.status === 'Paid').reduce((a, p) => a + p.amount, 0),
+    total: deals.reduce((a, d) => a + Number(d.commission || 0), 0),
+    pending: deals.filter((d) => d.commissionStatus === 'Pending').reduce((a, d) => a + Number(d.commission || 0), 0),
+    processing: deals.filter((d) => d.commissionStatus === 'Processing').reduce((a, d) => a + Number(d.commission || 0), 0),
+    paid: deals.filter((d) => d.commissionStatus === 'Paid').reduce((a, d) => a + Number(d.commission || 0), 0),
   }
 
-  const markAsPaid = (id) => {
+  const markAsPaid = async (id) => {
     const today = new Date().toISOString().slice(0, 10)
-    const next = payouts.map((p) => (p.id === id ? { ...p, status: 'Paid', paidDate: today } : p))
-    setPayouts(next)
-    savePartnerPayouts(next)
+    const { data } = await api.put(`/deals/${id}`, { commissionStatus: 'Paid', commissionPaidDate: today })
+    setDeals((prev) => prev.map((d) => (d._id === id ? { ...d, ...data } : d)))
   }
 
   return (
@@ -66,7 +76,7 @@ export default function PartnerPayoutsPage() {
           className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
         >
           <option value="All">All Partners</option>
-          {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {partners.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
         </select>
         <select
           value={status}
@@ -86,7 +96,7 @@ export default function PartnerPayoutsPage() {
             <thead>
               <tr className="text-left text-xs text-gray-500 uppercase tracking-wide bg-gray-50 border-b border-gray-100">
                 <th className="px-4 py-3">Partner</th>
-                <th className="px-4 py-3">Deal Ref</th>
+                <th className="px-4 py-3">Deal</th>
                 <th className="px-4 py-3">Project</th>
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Due Date</th>
@@ -95,33 +105,37 @@ export default function PartnerPayoutsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {rows.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">Loading...</td>
+                </tr>
+              ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400">No payouts found</td>
                 </tr>
               ) : (
-                rows.map((p) => (
-                  <tr key={p.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-700 font-medium">{p.partnerName}</td>
-                    <td className="px-4 py-3 text-gray-600">{p.dealRef}</td>
-                    <td className="px-4 py-3 text-gray-600">{p.projectName}</td>
-                    <td className="px-4 py-3 text-gray-700 font-semibold">INR {Number(p.amount).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-gray-600">{p.dueDate}</td>
+                rows.map((d) => (
+                  <tr key={d._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-700 font-medium">{d.partnerName}</td>
+                    <td className="px-4 py-3 text-gray-600">{d.dealName}</td>
+                    <td className="px-4 py-3 text-gray-600">{d.unit?.project?.name || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700 font-semibold">INR {Number(d.commission || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-600">{d.commissionDueDate ? new Date(d.commissionDueDate).toLocaleDateString() : '-'}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusStyle[p.status] || 'bg-gray-100 text-gray-600'}`}>
-                        {p.status}
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${statusStyle[d.commissionStatus] || 'bg-gray-100 text-gray-600'}`}>
+                        {d.commissionStatus}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      {p.status !== 'Paid' ? (
+                      {d.commissionStatus !== 'Paid' ? (
                         <button
-                          onClick={() => markAsPaid(p.id)}
+                          onClick={() => markAsPaid(d._id)}
                           className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                         >
                           Mark Paid
                         </button>
                       ) : (
-                        <span className="text-xs text-gray-400">Paid on {p.paidDate || '-'}</span>
+                        <span className="text-xs text-gray-400">Paid on {d.commissionPaidDate ? new Date(d.commissionPaidDate).toLocaleDateString() : '-'}</span>
                       )}
                     </td>
                   </tr>

@@ -25,7 +25,7 @@ export default function SettingsTab({ id, project }) {
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-gray-800">Project Settings</h3>
+          <h3 className="font-semibold text-gray-800">Project Configuration</h3>
           <p className="text-sm text-gray-500 mt-0.5">Update name, status, dates, pricing, sales info, and contact details.</p>
         </div>
         <Link to={`/projects/${id}/edit`} className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors shrink-0">
@@ -47,14 +47,14 @@ export default function SettingsTab({ id, project }) {
 
       <div className="rounded-xl border border-red-200 bg-red-50 p-5">
         <h3 className="font-semibold text-red-800 mb-1">Danger Zone</h3>
-        <p className="text-sm text-red-600 mb-3">Deleting a project permanently removes it, including its inventory. This cannot be undone.</p>
+        <p className="text-sm text-red-600 mb-3">Archiving / deleting a project permanently removes it, including its inventory. This cannot be undone.</p>
         <button
           type="button"
           onClick={handleDelete}
           disabled={deleting}
           className="text-sm font-medium px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
         >
-          {deleting ? 'Deleting...' : confirmDelete ? 'Click again to confirm delete' : 'Delete Project'}
+          {deleting ? 'Deleting...' : confirmDelete ? 'Click again to confirm delete' : 'Archive / Delete Project'}
         </button>
       </div>
     </div>

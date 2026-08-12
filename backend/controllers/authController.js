@@ -1,41 +1,98 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { hashValue, generateOtp, isStrongPassword } = require('../utils/security');
-const { sendMail } = require('../utils/email');
+const { isPlatformRole } = require('../models/User');
+const Membership = require('../models/Membership');
+const Builder = require('../models/Builder');
+const { isStrongPassword } = require('../utils/security');
+const { recordAudit } = require('../utils/auditLog');
+const { sanitizeUser } = require('../utils/sanitizeUser');
+const { resolveEffectivePermissions } = require('../utils/roleService');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const INVITE_EXPIRY_HOURS = Number(process.env.INVITE_EXPIRY_HOURS || 72);
-const OTP_EXPIRY_MINUTES = Number(process.env.OTP_EXPIRY_MINUTES || 10);
-const OTP_MAX_ATTEMPTS = Number(process.env.OTP_MAX_ATTEMPTS || 5);
-const OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.OTP_RESEND_COOLDOWN_SECONDS || 60);
+const PRE_SELECT_TOKEN_EXPIRES_IN = '10m';
+const PASSWORD_RESET_TOKEN_EXPIRES_IN = '15m';
 
-const generateToken = (id, role) =>
-  jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+const generateToken = (id, role, builderId, membershipId, expiresIn = JWT_EXPIRES_IN) =>
+  jwt.sign({ id, role, builderId, membershipId }, process.env.JWT_SECRET, { expiresIn });
 
-const sanitizeUser = (user) => ({
-  _id: user._id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-  isActive: user.isActive,
-});
+const generatePasswordResetToken = (id) =>
+  jwt.sign({ id, purpose: 'password-reset' }, process.env.JWT_SECRET, { expiresIn: PASSWORD_RESET_TOKEN_EXPIRES_IN });
 
-const createAndAttachOtp = (user) => {
-  const otp = generateOtp();
-  user.otpCodeHash = hashValue(otp);
-  user.otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
-  user.otpAttempts = 0;
-  user.otpLastSentAt = new Date();
-  return otp;
+// Shared by login() and setPassword() — both end with "figure out this
+// account's session and hand back a token". Platform staff get a token
+// immediately; org-tier users with exactly one active builder membership are
+// auto-scoped the same way; with more than one, the client must call
+// POST /api/auth/select-builder before it gets a fully scoped token.
+const buildSessionResponse = async (req, user) => {
+  if (isPlatformRole(user.role)) {
+    recordAudit({
+      actor: user._id,
+      action: 'login',
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+    return {
+      ...sanitizeUser(user),
+      role: user.role,
+      builderId: null,
+      permissions: [],
+      token: generateToken(user._id, user.role, null, null),
+    };
+  }
+
+  const memberships = await Membership.find({ userId: user._id, status: 'active' }).populate(
+    'builderId',
+    'name slug status'
+  );
+  const activeMemberships = memberships.filter((m) => m.builderId?.status === 'active');
+
+  if (activeMemberships.length === 0) {
+    const err = new Error('No active organization membership found. Contact your administrator.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  if (activeMemberships.length > 1) {
+    return {
+      requiresBuilderSelection: true,
+      preToken: generateToken(user._id, null, null, null, PRE_SELECT_TOKEN_EXPIRES_IN),
+      memberships: activeMemberships.map((m) => ({
+        builderId: m.builderId._id,
+        builderName: m.builderId.name,
+        role: m.role,
+        membershipId: m._id,
+      })),
+    };
+  }
+
+  const membership = activeMemberships[0];
+  recordAudit({
+    builderId: membership.builderId._id,
+    actor: user._id,
+    action: 'login',
+    targetType: 'User',
+    targetId: user._id,
+    metadata: { ip: req.ip, userAgent: req.headers['user-agent'] },
+  });
+
+  const permissions = await resolveEffectivePermissions(membership.builderId._id, membership.role);
+
+  return {
+    ...sanitizeUser(user),
+    role: membership.role,
+    builderId: membership.builderId._id,
+    builderName: membership.builderId.name,
+    membershipId: membership._id,
+    permissions,
+    token: generateToken(user._id, membership.role, membership.builderId._id, membership._id),
+  };
 };
 
-const sendOtpMail = async (user, otp) => {
-  const subject = 'Your PropVault verification code';
-  const text = `Your OTP is ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes.`;
-  return sendMail({ to: user.email, subject, text });
-};
-
-// @desc  Role-based login
+// @desc  Role-based login. Accounts still on their invite's temporary
+//        password are stopped short of a real session and handed a
+//        short-lived resetToken instead — the client must call
+//        POST /api/auth/set-password to finish onboarding before it gets in.
 // @route POST /api/auth/login
 const login = async (req, res) => {
   try {
@@ -54,34 +111,115 @@ const login = async (req, res) => {
       return res.status(403).json({ message: 'Account deactivated. Contact administrator.' });
     }
 
-    if (user.role !== 'admin' && (!user.passwordSet || !user.emailVerified)) {
-      return res.status(403).json({
-        message: 'Onboarding is pending. Please complete invite setup first.',
+    if (user.mustChangePassword) {
+      return res.json({
+        requiresPasswordChange: true,
+        resetToken: generatePasswordResetToken(user._id),
+        email: user.email,
       });
     }
 
+    const session = await buildSessionResponse(req, user);
+    res.json(session);
+  } catch (err) {
+    res.status(err.statusCode || 500).json({ message: err.message });
+  }
+};
+
+// @desc  Complete login when an account has more than one active builder
+//        membership (or to switch orgs mid-session). Re-validates the
+//        membership fresh rather than trusting the caller.
+// @route POST /api/auth/select-builder
+const selectBuilder = async (req, res) => {
+  try {
+    const { builderId } = req.body;
+    if (!builderId) {
+      return res.status(400).json({ message: 'builderId is required' });
+    }
+
+    const membership = await Membership.findOne({
+      userId: req.user._id,
+      builderId,
+      status: 'active',
+    }).populate('builderId', 'name slug status');
+
+    if (!membership || membership.builderId?.status !== 'active') {
+      return res.status(403).json({ message: 'You do not have access to that organization' });
+    }
+
+    recordAudit({
+      builderId: membership.builderId._id,
+      actor: req.user._id,
+      action: 'login',
+      targetType: 'User',
+      targetId: req.user._id,
+      metadata: { ip: req.ip, userAgent: req.headers['user-agent'], switchedOrg: true },
+    });
+
+    const permissions = await resolveEffectivePermissions(membership.builderId._id, membership.role);
+
     res.json({
-      ...sanitizeUser(user),
-      token: generateToken(user._id, user.role),
+      ...sanitizeUser(req.user),
+      role: membership.role,
+      builderId: membership.builderId._id,
+      builderName: membership.builderId.name,
+      membershipId: membership._id,
+      permissions,
+      token: generateToken(req.user._id, membership.role, membership.builderId._id, membership._id),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Get current logged-in admin
-// @route GET /api/auth/me
-const getMe = async (req, res) => {
+// @desc  List every active organization the current account belongs to —
+//        powers the "switch organization" control (distinct from login's
+//        one-time builder-selection step, this is for switching mid-session).
+// @route GET /api/auth/memberships
+const listMyMemberships = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(sanitizeUser(user));
+    if (isPlatformRole(req.user.role)) {
+      return res.json([]);
+    }
+    const memberships = await Membership.find({ userId: req.user._id, status: 'active' }).populate(
+      'builderId',
+      'name slug status'
+    );
+    res.json(
+      memberships
+        .filter((m) => m.builderId?.status === 'active')
+        .map((m) => ({ builderId: m.builderId._id, builderName: m.builderId.name, role: m.role, membershipId: m._id }))
+    );
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Seed first admin (disabled by default in production)
+// @desc  Get current logged-in user's session (account + active org context)
+// @route GET /api/auth/me
+const getMe = async (req, res) => {
+  try {
+    if (isPlatformRole(req.user.role)) {
+      return res.json({ ...sanitizeUser(req.user), role: req.user.role, builderId: null, permissions: [] });
+    }
+    if (!req.membership) {
+      return res.status(403).json({ message: 'No organization selected for this session' });
+    }
+    const membership = await req.membership.populate('builderId', 'name slug status');
+    res.json({
+      ...sanitizeUser(req.user),
+      role: membership.role,
+      builderId: membership.builderId._id,
+      builderName: membership.builderId.name,
+      membershipId: membership._id,
+      permissions: [...(req.permissions || [])],
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Seed the first PropVault platform admin (disabled by default in production)
 // @route POST /api/auth/seed-admin
 const seedAdmin = async (req, res) => {
   try {
@@ -89,9 +227,9 @@ const seedAdmin = async (req, res) => {
       return res.status(403).json({ message: 'Seed admin is disabled in production' });
     }
 
-    const adminExists = await User.findOne({ role: 'admin' });
+    const adminExists = await User.findOne({ role: 'platform_admin' });
     if (adminExists) {
-      return res.status(400).json({ message: 'Admin already exists' });
+      return res.status(400).json({ message: 'Platform admin already exists' });
     }
 
     const { name, email, password } = req.body;
@@ -110,232 +248,95 @@ const seedAdmin = async (req, res) => {
       name,
       email,
       password,
-      role: 'admin',
+      role: 'platform_admin',
       passwordSet: true,
       emailVerified: true,
-      inviteStatus: 'accepted',
       onboardingCompletedAt: new Date(),
     });
     res.status(201).json({
       ...sanitizeUser(admin),
-      token: generateToken(admin._id, admin.role),
+      role: admin.role,
+      builderId: null,
+      token: generateToken(admin._id, admin.role, null, null),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Validate invite token details
-// @route GET /api/auth/invite/:token
-const validateInvite = async (req, res) => {
+// @desc  Complete first-login onboarding: swap the invite's temporary
+//        password for a real one, activate any memberships still waiting on
+//        this account (and their builder, if this is that org's first admin
+//        signing in for the first time), then log the user straight in.
+// @route POST /api/auth/set-password
+const setPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const tokenHash = hashValue(token);
-    const user = await User.findOne({ inviteTokenHash: tokenHash }).select(
-      '+inviteTokenHash +inviteTokenExpiresAt +inviteStatus'
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'Invite not found' });
+    const { resetToken, newPassword } = req.body;
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ message: 'Reset token and new password are required' });
     }
 
-    if (user.inviteStatus === 'revoked') {
-      return res.status(400).json({ message: 'Invite has been revoked' });
+    let decoded;
+    try {
+      decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: 'This reset link has expired. Please log in again with your temporary password.' });
+    }
+    if (decoded.purpose !== 'password-reset') {
+      return res.status(400).json({ message: 'Invalid reset token' });
     }
 
-    if (user.inviteStatus === 'accepted') {
-      return res.status(400).json({ message: 'Invite already used' });
-    }
-
-    if (!user.inviteTokenExpiresAt || user.inviteTokenExpiresAt < new Date()) {
-      user.inviteStatus = 'expired';
-      await user.save();
-      return res.status(400).json({ message: 'Invite has expired' });
-    }
-
-    res.json({
-      invite: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        expiresAt: user.inviteTokenExpiresAt,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// @desc  Accept invite and set password, then send OTP
-// @route POST /api/auth/invite/accept
-const acceptInvite = async (req, res) => {
-  try {
-    const { token, password } = req.body;
-    if (!token || !password) {
-      return res.status(400).json({ message: 'Invite token and password are required' });
-    }
-
-    if (!isStrongPassword(password)) {
+    if (!isStrongPassword(newPassword)) {
       return res.status(400).json({
         message:
           'Password must be at least 8 characters and include uppercase, lowercase, number and special character.',
       });
     }
 
-    const tokenHash = hashValue(token);
-    const user = await User.findOne({ inviteTokenHash: tokenHash }).select(
-      '+inviteTokenHash +inviteTokenExpiresAt +inviteStatus +otpCodeHash +otpExpiresAt +otpAttempts +otpLastSentAt +password'
-    );
+    const user = await User.findById(decoded.id).select('+password');
     if (!user) {
-      return res.status(404).json({ message: 'Invite not found' });
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    if (!user.mustChangePassword) {
+      return res.status(400).json({ message: 'Password has already been set for this account. Please log in normally.' });
     }
 
-    if (user.inviteStatus === 'revoked') {
-      return res.status(400).json({ message: 'Invite has been revoked' });
-    }
-
-    if (!user.inviteTokenExpiresAt || user.inviteTokenExpiresAt < new Date()) {
-      user.inviteStatus = 'expired';
-      await user.save();
-      return res.status(400).json({ message: 'Invite has expired' });
-    }
-
-    user.password = password;
-    user.passwordSet = true;
-    user.inviteStatus = 'pending_otp';
-    const otp = createAndAttachOtp(user);
+    user.password = newPassword;
+    user.mustChangePassword = false;
+    if (!user.onboardingCompletedAt) user.onboardingCompletedAt = new Date();
     await user.save();
 
-    const mailResult = await sendOtpMail(user, otp);
+    const invitedMemberships = await Membership.find({ userId: user._id, status: 'invited' });
+    for (const membership of invitedMemberships) {
+      membership.status = 'active';
+      membership.inviteStatus = 'accepted';
+      membership.activatedAt = new Date();
+      await membership.save();
 
-    res.json({
-      message: 'Password set. OTP sent to your email.',
-      email: user.email,
-      otpDelivery: mailResult.sent ? 'email' : 'not_configured',
-      // Useful in local/dev where SMTP is not configured yet.
-      devOtp: process.env.NODE_ENV === 'production' ? undefined : otp,
-    });
+      if (membership.role === 'builder_admin') {
+        const builder = await Builder.findById(membership.builderId);
+        if (builder && builder.status === 'pending') {
+          builder.status = 'active';
+          builder.activatedAt = new Date();
+          await builder.save();
+        }
+      }
+    }
+
+    const session = await buildSessionResponse(req, user);
+    res.json({ message: 'Password set successfully', ...session });
   } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// @desc  Resend OTP for pending invite onboarding
-// @route POST /api/auth/invite/resend-otp
-const resendInviteOtp = async (req, res) => {
-  try {
-    const { token } = req.body;
-    if (!token) {
-      return res.status(400).json({ message: 'Invite token is required' });
-    }
-
-    const tokenHash = hashValue(token);
-    const user = await User.findOne({ inviteTokenHash: tokenHash }).select(
-      '+inviteTokenHash +inviteTokenExpiresAt +inviteStatus +otpCodeHash +otpExpiresAt +otpAttempts +otpLastSentAt'
-    );
-    if (!user) {
-      return res.status(404).json({ message: 'Invite not found' });
-    }
-
-    if (user.inviteStatus !== 'pending_otp') {
-      return res.status(400).json({ message: 'OTP resend is not available for this invite state' });
-    }
-
-    if (!user.inviteTokenExpiresAt || user.inviteTokenExpiresAt < new Date()) {
-      user.inviteStatus = 'expired';
-      await user.save();
-      return res.status(400).json({ message: 'Invite has expired' });
-    }
-
-    if (
-      user.otpLastSentAt &&
-      Date.now() - user.otpLastSentAt.getTime() < OTP_RESEND_COOLDOWN_SECONDS * 1000
-    ) {
-      return res.status(429).json({ message: 'Please wait before requesting another OTP' });
-    }
-
-    const otp = createAndAttachOtp(user);
-    await user.save();
-
-    const mailResult = await sendOtpMail(user, otp);
-    res.json({
-      message: 'OTP resent successfully',
-      otpDelivery: mailResult.sent ? 'email' : 'not_configured',
-      devOtp: process.env.NODE_ENV === 'production' ? undefined : otp,
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// @desc  Verify OTP and complete invite onboarding
-// @route POST /api/auth/invite/verify-otp
-const verifyInviteOtp = async (req, res) => {
-  try {
-    const { token, otp } = req.body;
-    if (!token || !otp) {
-      return res.status(400).json({ message: 'Invite token and OTP are required' });
-    }
-
-    const tokenHash = hashValue(token);
-    const user = await User.findOne({ inviteTokenHash: tokenHash }).select(
-      '+inviteTokenHash +inviteTokenExpiresAt +inviteStatus +otpCodeHash +otpExpiresAt +otpAttempts +otpLastSentAt +password'
-    );
-    if (!user) {
-      return res.status(404).json({ message: 'Invite not found' });
-    }
-
-    if (user.inviteStatus !== 'pending_otp') {
-      return res.status(400).json({ message: 'OTP verification is not available for this invite state' });
-    }
-
-    if (!user.inviteTokenExpiresAt || user.inviteTokenExpiresAt < new Date()) {
-      user.inviteStatus = 'expired';
-      await user.save();
-      return res.status(400).json({ message: 'Invite has expired' });
-    }
-
-    if (!user.otpCodeHash || !user.otpExpiresAt || user.otpExpiresAt < new Date()) {
-      return res.status(400).json({ message: 'OTP has expired. Please request a new OTP.' });
-    }
-
-    if (user.otpAttempts >= OTP_MAX_ATTEMPTS) {
-      return res.status(429).json({ message: 'Too many failed OTP attempts. Please resend OTP.' });
-    }
-
-    if (hashValue(otp) !== user.otpCodeHash) {
-      user.otpAttempts += 1;
-      await user.save();
-      return res.status(400).json({ message: 'Invalid OTP' });
-    }
-
-    user.emailVerified = true;
-    user.inviteStatus = 'accepted';
-    user.onboardingCompletedAt = new Date();
-    user.inviteTokenHash = null;
-    user.inviteTokenExpiresAt = null;
-    user.otpCodeHash = null;
-    user.otpExpiresAt = null;
-    user.otpAttempts = 0;
-    user.otpLastSentAt = null;
-    await user.save();
-
-    res.json({
-      ...sanitizeUser(user),
-      token: generateToken(user._id, user.role),
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message });
   }
 };
 
 module.exports = {
   login,
+  selectBuilder,
+  listMyMemberships,
   getMe,
   seedAdmin,
-  validateInvite,
-  acceptInvite,
-  resendInviteOtp,
-  verifyInviteOtp,
-  INVITE_EXPIRY_HOURS,
+  setPassword,
+  sanitizeUser,
+  generateToken,
 };

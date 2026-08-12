@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { suggestLeadFollowUp } from '../api/aiApi'
 
 const NURTURE_STAGES = ['Cold', 'Warm', 'Interested', 'Very Interested', 'Nurtured']
 
@@ -37,6 +38,8 @@ export default function LeadDetailPage() {
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [updatingStage, setUpdatingStage] = useState(false)
   const [updatingScore, setUpdatingScore] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
 
   useEffect(() => {
     api.get(`/leads/${id}`)
@@ -61,6 +64,18 @@ export default function LeadDetailPage() {
       setLead(res.data)
     } catch { /* ignore */ }
     finally { setUpdatingScore(false) }
+  }
+
+  const handleSuggestFollowUp = async () => {
+    setAiLoading(true)
+    try {
+      const { suggestion } = await suggestLeadFollowUp(id)
+      setAiSuggestion(suggestion)
+    } catch {
+      setAiSuggestion('Could not get a suggestion right now.')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const handleAddNote = async e => {
@@ -179,6 +194,23 @@ export default function LeadDetailPage() {
               <div className="col-span-2"><dt className="text-gray-500">Requirements</dt><dd className="font-medium mt-0.5">{lead.requirements}</dd></div>
             )}
           </dl>
+        </div>
+
+        {/* AI Follow-up Suggestion */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-800">✨ AI Follow-up Suggestion</h3>
+            <button
+              onClick={handleSuggestFollowUp}
+              disabled={aiLoading}
+              className="text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {aiLoading ? 'Thinking…' : 'Suggest Follow-up (AI)'}
+            </button>
+          </div>
+          {aiSuggestion && (
+            <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3">{aiSuggestion}</p>
+          )}
         </div>
 
         {/* Unit Interest */}

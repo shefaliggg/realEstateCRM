@@ -25,6 +25,7 @@ const followUpTaskSchema = new mongoose.Schema(
 
 const leadSchema = new mongoose.Schema(
   {
+    builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder', required: true, index: true },
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     email: { type: String, trim: true, lowercase: true },
@@ -48,6 +49,7 @@ const leadSchema = new mongoose.Schema(
     requirements: String,
     city: String,
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+    channelPartner: { type: mongoose.Schema.Types.ObjectId, ref: 'ChannelPartner', default: null },
     // Units the lead has shown interest in
     unitInterest: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Unit' }],
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

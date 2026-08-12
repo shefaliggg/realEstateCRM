@@ -1,6 +1,12 @@
-import { amenityIcon, formatDate, formatPrice } from './shared'
+import { amenityIcon, formatDate, formatPrice, getInitials } from './shared'
 
 export default function ProfileTab({ project, profileTypeConfig, locationText, mapSrc, mapActionLink }) {
+  const assignedUsers = Array.isArray(project.managedBy) ? project.managedBy.filter((u) => u && typeof u === 'object') : []
+  const designationByUserId = new Map(
+    (project.teamDesignations || [])
+      .map((d) => [typeof d.user === 'string' ? d.user : d.user?._id, d.designation])
+      .filter(([userId]) => userId)
+  )
   const pricing = project.pricing || {}
   const chargeEntries = [
     ['Base Price / Sq.ft', pricing.basePricePerSqft ? formatPrice(pricing.basePricePerSqft) : null],
@@ -186,6 +192,26 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
               </dl>
             </div>
           )}
+        </div>
+      )}
+
+      {assignedUsers.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="font-semibold text-gray-800 mb-3">👥 Assigned Team</h3>
+          <div className="flex flex-wrap gap-3">
+            {assignedUsers.map((u) => (
+              <div key={u._id} className="flex items-center gap-2 rounded-full border border-gray-100 bg-slate-50 pl-1.5 pr-3 py-1.5">
+                <span className="h-7 w-7 rounded-full bg-primary-100 text-primary-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {getInitials(u.name)}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-800 truncate">{u.name}</p>
+                  <p className="text-[10px] text-gray-400 truncate">{designationByUserId.get(u._id) || u.role || 'Team member'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-400 mt-2">Manage team & designations from the Team tab.</p>
         </div>
       )}
     </div>

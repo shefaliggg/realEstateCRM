@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import api from '../api/axios'
 
 const ROLES = [
-  'admin',
+  'builder_admin',
   'sales_manager',
   'sales_executive',
   'crm_manager',
@@ -12,7 +12,23 @@ const ROLES = [
   'marketing_executive',
 ]
 
-const PENDING_STATUSES = ['pending', 'pending_otp']
+const PENDING_STATUSES = ['pending']
+
+// GET/PUT /users/:id return a Membership row (role/inviteStatus are per-org,
+// not on the account) with the account nested at `.user` — flatten it once
+// here so the rest of this page can stay a simple "user" shape.
+function flattenMembership(m) {
+  return {
+    ...m.user,
+    role: m.role,
+    status: m.status,
+    inviteStatus: m.inviteStatus,
+    membershipId: m.membershipId,
+    // "Joined"/"Last Updated" below mean joined-this-org, not account creation.
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
+  }
+}
 
 function InfoRow({ label, value }) {
   return (
@@ -46,15 +62,16 @@ export default function UserProfilePage() {
 
   // edit mode
   const [editMode, setEditMode] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', email: '', phone: '', role: '' })
+  const [editForm, setEditForm] = useState({ name: '', phone: '', role: '' })
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
   useEffect(() => {
     api.get(`/users/${id}`)
       .then(({ data }) => {
-        setUser(data)
-        setEditForm({ name: data.name, email: data.email, phone: data.phone || '', role: data.role })
+        const flat = flattenMembership(data)
+        setUser(flat)
+        setEditForm({ name: flat.name, phone: flat.phone || '', role: flat.role })
       })
       .catch(() => setError('Failed to load user profile.'))
       .finally(() => setLoading(false))
@@ -64,9 +81,10 @@ export default function UserProfilePage() {
     setToggling(true)
     setToggleMsg('')
     try {
-      const { data } = await api.put(`/users/${id}`, { isActive: !user.isActive })
-      setUser(data)
-      setToggleMsg(data.isActive ? 'User activated.' : 'User deactivated.')
+      const { data } = await api.put(`/users/${id}`, { isActive: user.status !== 'active' })
+      const flat = flattenMembership(data)
+      setUser(flat)
+      setToggleMsg(flat.status === 'active' ? 'User activated.' : 'User deactivated.')
     } catch {
       setToggleMsg('Failed to update status.')
     } finally {
@@ -94,12 +112,12 @@ export default function UserProfilePage() {
     try {
       const { data } = await api.put(`/users/${id}`, {
         name: editForm.name,
-        email: editForm.email,
         phone: editForm.phone,
         role: editForm.role,
       })
-      setUser(data)
-      setEditForm({ name: data.name, email: data.email, phone: data.phone || '', role: data.role })
+      const flat = flattenMembership(data)
+      setUser(flat)
+      setEditForm({ name: flat.name, phone: flat.phone || '', role: flat.role })
       setSaveMsg('Profile updated.')
       setEditMode(false)
     } catch {
@@ -132,6 +150,9 @@ export default function UserProfilePage() {
 
   const initials = user.name?.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase() ?? 'A'
   const canResend = PENDING_STATUSES.includes(user.inviteStatus)
+  // Deactivating here revokes access to THIS org (membership.status), not the
+  // shared account — the same person may still be active at another builder.
+  const isOrgActive = user.status === 'active'
 
   return (
     <div className="p-6 max-w-4xl">
@@ -154,8 +175,8 @@ export default function UserProfilePage() {
             <span className="text-xs font-medium px-3 py-1 rounded-full bg-primary-50 text-primary-700 capitalize">
               {user.role?.replace(/_/g, ' ')}
             </span>
-            <span className={`text-xs font-medium px-3 py-1 rounded-full ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-              {user.isActive ? 'Active' : 'Inactive'}
+            <span className={`text-xs font-medium px-3 py-1 rounded-full ${isOrgActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+              {isOrgActive ? 'Active' : 'Inactive'}
             </span>
             <span className={`text-xs font-medium px-3 py-1 rounded-full ${user.inviteStatus === 'accepted' ? 'bg-blue-50 text-blue-700' : 'bg-yellow-50 text-yellow-700'}`}>
               Invite: {user.inviteStatus || 'none'}
@@ -185,12 +206,12 @@ export default function UserProfilePage() {
               onClick={handleToggleActive}
               disabled={toggling}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition disabled:opacity-50 ${
-                user.isActive
+                isOrgActive
                   ? 'border-red-200 text-red-600 bg-red-50 hover:bg-red-100'
                   : 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
               }`}
             >
-              {toggling ? 'Updating...' : user.isActive ? 'Deactivate' : 'Activate'}
+              {toggling ? 'Updating...' : isOrgActive ? 'Deactivate' : 'Activate'}
             </button>
           </div>
           {toggleMsg && <p className="text-xs text-gray-500 text-right">{toggleMsg}</p>}
@@ -210,16 +231,6 @@ export default function UserProfilePage() {
                 className="input-field w-full"
                 value={editForm.name}
                 onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Email</label>
-              <input
-                required
-                type="email"
-                className="input-field w-full"
-                value={editForm.email}
-                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
               />
             </div>
             <div>

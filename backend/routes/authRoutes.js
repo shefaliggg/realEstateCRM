@@ -2,21 +2,20 @@ const express = require('express');
 const router = express.Router();
 const {
 	login,
+	selectBuilder,
+	listMyMemberships,
 	getMe,
 	seedAdmin,
-	validateInvite,
-	acceptInvite,
-	resendInviteOtp,
-	verifyInviteOtp,
+	setPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+const { attachTenantScope } = require('../middleware/tenantMiddleware');
 
 router.post('/login', login);
-router.get('/me', protect, getMe);
-router.get('/invite/:token', validateInvite);
-router.post('/invite/accept', acceptInvite);
-router.post('/invite/resend-otp', resendInviteOtp);
-router.post('/invite/verify-otp', verifyInviteOtp);
+router.post('/set-password', setPassword);
+router.post('/select-builder', protect, selectBuilder);
+router.get('/memberships', protect, listMyMemberships);
+router.get('/me', protect, attachTenantScope, getMe);
 
 // One-time seed: creates first admin if none exists
 router.post('/seed-admin', seedAdmin);

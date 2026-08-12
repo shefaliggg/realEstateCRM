@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getPartners, savePartners } from '../utils/channelPartnerStore'
+import { getChannelPartners, createChannelPartner } from '../api/channelPartnerApi'
 
 const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
 export default function ChannelPartnersPage() {
-  const [partners, setPartners] = useState(getPartners())
+  const [partners, setPartners] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('All')
   const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({
     name: '',
     contactPerson: '',
@@ -17,6 +20,10 @@ export default function ChannelPartnersPage() {
     city: '',
     commissionRate: 1,
   })
+
+  useEffect(() => {
+    getChannelPartners().then(setPartners).finally(() => setLoading(false))
+  }, [])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -29,7 +36,7 @@ export default function ChannelPartnersPage() {
         || p.contactPerson.toLowerCase().includes(q)
         || p.phone.toLowerCase().includes(q)
         || p.email.toLowerCase().includes(q)
-        || p.city.toLowerCase().includes(q)
+        || (p.city || '').toLowerCase().includes(q)
       )
     })
   }, [partners, search, status])
@@ -43,23 +50,24 @@ export default function ChannelPartnersPage() {
       : '0.00',
   }
 
-  const addPartner = (e) => {
+  const addPartner = async (e) => {
     e.preventDefault()
     if (!form.name || !form.contactPerson || !form.phone || !form.email) return
-    const next = [
-      {
-        id: `cp-${Date.now()}`,
+    setSaving(true)
+    setError('')
+    try {
+      const { partner } = await createChannelPartner({
         ...form,
         commissionRate: Number(form.commissionRate || 0),
-        active: true,
-        joinedAt: new Date().toISOString().slice(0, 10),
-      },
-      ...partners,
-    ]
-    setPartners(next)
-    savePartners(next)
-    setShowAdd(false)
-    setForm({ name: '', contactPerson: '', phone: '', email: '', city: '', commissionRate: 1 })
+      })
+      setPartners((prev) => [partner, ...prev])
+      setShowAdd(false)
+      setForm({ name: '', contactPerson: '', phone: '', email: '', city: '', commissionRate: 1 })
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to add partner.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -124,38 +132,43 @@ export default function ChannelPartnersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <p className="font-semibold text-gray-900">{p.name}</p>
-                    <p className="text-xs text-gray-500">{p.contactPerson}</p>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    <p>{p.phone}</p>
-                    <p className="text-xs text-gray-500">{p.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{p.city || '-'}</td>
-                  <td className="px-4 py-3 text-gray-600">{p.commissionRate}%</td>
-                  <td className="px-4 py-3 text-gray-600">{p.joinedAt}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {p.active ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/partners/${p.id}`}
-                      className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                    >
-                      View
-                    </Link>
-                  </td>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400">Loading partners...</td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-gray-400">No partners found</td>
                 </tr>
+              ) : (
+                filtered.map((p) => (
+                  <tr key={p._id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-500">{p.contactPerson}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      <p>{p.phone}</p>
+                      <p className="text-xs text-gray-500">{p.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{p.city || '-'}</td>
+                    <td className="px-4 py-3 text-gray-600">{p.commissionRate}%</td>
+                    <td className="px-4 py-3 text-gray-600">{new Date(p.joinedAt).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                        {p.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/partners/${p._id}`}
+                        className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -166,6 +179,8 @@ export default function ChannelPartnersPage() {
         <div className="fixed inset-0 bg-black/20 z-40 flex items-center justify-center px-4">
           <form onSubmit={addPartner} className="w-full max-w-lg bg-white rounded-xl shadow-lg p-5 space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Add Channel Partner</h2>
+            <p className="text-xs text-gray-500 -mt-2">This creates a portal login and emails an invite to the contact person.</p>
+            {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs">{error}</div>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Company Name</label>
@@ -194,7 +209,9 @@ export default function ChannelPartnersPage() {
             </div>
             <div className="flex gap-3 justify-end">
               <button type="button" onClick={() => setShowAdd(false)} className="border border-gray-200 px-4 py-2 rounded-lg text-sm">Cancel</button>
-              <button type="submit" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm">Save Partner</button>
+              <button type="submit" disabled={saving} className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save Partner'}
+              </button>
             </div>
           </form>
         </div>

@@ -6,15 +6,10 @@ import OverviewTab from './projectDetail/OverviewTab'
 import ProfileTab from './projectDetail/ProfileTab'
 import TowersTab from './projectDetail/TowersTab'
 import InventoryTab from './projectDetail/InventoryTab'
-import LeadsTab from './projectDetail/LeadsTab'
-import BookingsTab from './projectDetail/BookingsTab'
-import CustomersTab from './projectDetail/CustomersTab'
-import PaymentsTab from './projectDetail/PaymentsTab'
 import DocumentsTab from './projectDetail/DocumentsTab'
 import GalleryTab from './projectDetail/GalleryTab'
-import ReportsTab from './projectDetail/ReportsTab'
 import ActivityTab from './projectDetail/ActivityTab'
-import ManagedByTab from './projectDetail/ManagedByTab'
+import TeamTab from './projectDetail/TeamTab'
 import SettingsTab from './projectDetail/SettingsTab'
 
 const PROFILE_TYPE_CONFIG = {
@@ -30,15 +25,10 @@ const TABS = [
   { key: 'profile', label: 'Profile' },
   { key: 'towers', label: 'Towers' },
   { key: 'inventory', label: 'Inventory' },
-  { key: 'leads', label: 'Leads' },
-  { key: 'bookings', label: 'Bookings' },
-  { key: 'customers', label: 'Customers' },
-  { key: 'payments', label: 'Payments' },
   { key: 'documents', label: 'Documents' },
   { key: 'gallery', label: 'Gallery' },
-  { key: 'reports', label: 'Reports' },
   { key: 'activity', label: 'Activity' },
-  { key: 'managedBy', label: 'Managed By' },
+  { key: 'team', label: 'Team' },
   { key: 'settings', label: 'Settings' },
 ]
 
@@ -48,9 +38,8 @@ export default function ProjectDetailPage() {
   const [units, setUnits] = useState([])
   const [towers, setTowers] = useState([])
   const [leads, setLeads] = useState([])
-  const [customers, setCustomers] = useState([])
+  const [deals, setDeals] = useState([])
   const [bookings, setBookings] = useState([])
-  const [schedules, setSchedules] = useState([])
   const [payments, setPayments] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -63,20 +52,6 @@ export default function ProjectDetailPage() {
   const refetchTowers = useCallback(() => {
     api.get(`/projects/${id}/towers`).then((res) => setTowers(res.data)).catch(() => {})
   }, [id])
-  const refetchLeads = useCallback(() => {
-    api.get(`/leads?project=${id}`).then((res) => setLeads(res.data)).catch(() => {})
-  }, [id])
-  const refetchCustomers = useCallback(() => {
-    api.get(`/customers?project=${id}`).then((res) => setCustomers(res.data)).catch(() => {})
-  }, [id])
-  const refetchBookings = useCallback(() => {
-    api.get(`/bookings?project=${id}`).then((res) => setBookings(res.data)).catch(() => {})
-  }, [id])
-  const refetchSchedulesAndPayments = useCallback(() => {
-    api.get(`/schedules?project=${id}`).then((res) => setSchedules(res.data)).catch(() => {})
-    api.get(`/payments?project=${id}`).then((res) => setPayments(res.data)).catch(() => {})
-    refetchBookings()
-  }, [id, refetchBookings])
 
   useEffect(() => {
     setLoading(true)
@@ -85,20 +60,18 @@ export default function ProjectDetailPage() {
       api.get(`/projects/${id}/units`),
       api.get(`/projects/${id}/towers`),
       api.get(`/leads?project=${id}`),
-      api.get(`/customers?project=${id}`),
+      api.get(`/deals?project=${id}`),
       api.get(`/bookings?project=${id}`),
-      api.get(`/schedules?project=${id}`),
       api.get(`/payments?project=${id}`),
       api.get('/users'),
     ])
-      .then(([pRes, uRes, towersRes, lRes, cRes, bRes, sRes, payRes, usersRes]) => {
+      .then(([pRes, uRes, towersRes, lRes, dRes, bRes, payRes, usersRes]) => {
         setProject(pRes.data)
         setUnits(uRes.data)
         setTowers(towersRes.data)
         setLeads(lRes.data)
-        setCustomers(cRes.data)
+        setDeals(dRes.data)
         setBookings(bRes.data)
-        setSchedules(sRes.data)
         setPayments(payRes.data)
         setUsers(usersRes.data || [])
       })
@@ -118,14 +91,6 @@ export default function ProjectDetailPage() {
   const profileTypeConfig = PROFILE_TYPE_CONFIG[projectType] || PROFILE_TYPE_CONFIG.Buildings
   const userById = new Map(users.map((u) => [u._id, u]))
 
-  const stats = {
-    total: units.length,
-    available: units.filter((u) => u.status === 'Available').length,
-    reserved: units.filter((u) => u.status === 'Reserved').length,
-    booked: units.filter((u) => u.status === 'Booked').length,
-    registered: units.filter((u) => u.status === 'Registered').length,
-  }
-
   const locationParts = [
     project.location?.address, project.location?.landmark, project.location?.locality, project.location?.city,
     project.location?.state, project.location?.pincode, project.location?.country,
@@ -142,20 +107,6 @@ export default function ProjectDetailPage() {
 
   const assignedUsers = Array.isArray(project.managedBy) ? project.managedBy : []
   const heroImage = project.coverImage || (project.images || [])[0] || ''
-
-  // KPI row 2: sales activity, real data from Lead follow-up tasks
-  const now = new Date()
-  const isSameDay = (d) => d && new Date(d).toDateString() === now.toDateString()
-  const allTasks = leads.flatMap((l) => (l.followUpTasks || []).map((t) => ({ ...t, leadId: l._id })))
-  const todaysLeads = leads.filter((l) => isSameDay(l.createdAt)).length
-  const siteVisitsToday = allTasks.filter((t) => t.type === 'Site Visit' && isSameDay(t.dueDate)).length
-  const pendingFollowUps = allTasks.filter((t) => !t.completed && t.dueDate && new Date(t.dueDate) <= now).length
-  const revenue = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0)
-
-  // KPI row 3
-  const collections = bookings.reduce((sum, b) => sum + (b.paidAmount || 0), 0)
-  const pendingAmount = revenue - collections
-  const occupancyPct = stats.total ? Math.round((stats.registered / stats.total) * 100) : 0
 
   return (
     <div className="p-6">
@@ -211,7 +162,6 @@ export default function ProjectDetailPage() {
               <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏠 Add Unit</Link>
               <Link to={`/projects/${id}/towers/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏢 Add Tower</Link>
               <Link to={`/leads/add?project=${id}`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">👤 Add Lead</Link>
-              <button onClick={() => setTab('bookings')} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">📑 Add Booking</button>
               {project.documents?.brochure && (
                 <a href={project.documents.brochure} target="_blank" rel="noreferrer" className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">⭳ Brochure</a>
               )}
@@ -239,26 +189,21 @@ export default function ProjectDetailPage() {
 
         {tab === 'overview' && (
           <OverviewTab
-            project={project} units={units} bookings={bookings} payments={payments} userById={userById}
-            stats={stats} todaysLeads={todaysLeads} siteVisitsToday={siteVisitsToday} pendingFollowUps={pendingFollowUps}
-            revenue={revenue} collections={collections} pendingAmount={pendingAmount} occupancyPct={occupancyPct}
-            onNavigateTab={setTab}
+            id={id} project={project} units={units} towers={towers} leads={leads} deals={deals}
+            bookings={bookings} payments={payments} userById={userById} onNavigateTab={setTab}
           />
         )}
         {tab === 'profile' && (
           <ProfileTab project={project} profileTypeConfig={profileTypeConfig} locationText={locationText} mapSrc={mapSrc} mapActionLink={mapActionLink} />
         )}
-        {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} />}
+        {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} onTowersChanged={refetchTowers} />}
         {tab === 'inventory' && <InventoryTab id={id} project={project} units={units} onUnitsChanged={refetchUnits} />}
-        {tab === 'leads' && <LeadsTab id={id} leads={leads} onLeadsChanged={refetchLeads} />}
-        {tab === 'bookings' && <BookingsTab id={id} bookings={bookings} customers={customers} units={units} onBookingsChanged={refetchBookings} onUnitsChanged={refetchUnits} />}
-        {tab === 'customers' && <CustomersTab id={id} customers={customers} units={units} onCustomersChanged={refetchCustomers} />}
-        {tab === 'payments' && <PaymentsTab bookings={bookings} schedules={schedules} onPaymentsChanged={refetchSchedulesAndPayments} />}
         {tab === 'documents' && <DocumentsTab project={project} />}
         {tab === 'gallery' && <GalleryTab project={project} />}
-        {tab === 'reports' && <ReportsTab project={project} units={units} towers={towers} />}
         {tab === 'activity' && <ActivityTab units={units} bookings={bookings} payments={payments} userById={userById} />}
-        {tab === 'managedBy' && <ManagedByTab id={id} project={project} users={users} onProjectChanged={(p) => setProject((prev) => ({ ...prev, ...p }))} />}
+        {tab === 'team' && (
+          <TeamTab id={id} project={project} users={users} onProjectChanged={(p) => setProject((prev) => ({ ...prev, ...p }))} />
+        )}
         {tab === 'settings' && <SettingsTab id={id} project={project} />}
       </div>
     </div>

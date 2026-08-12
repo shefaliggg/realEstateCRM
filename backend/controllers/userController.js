@@ -1,105 +1,129 @@
-const User = require('../models/User');
+const Membership = require('../models/Membership');
 const { ROLE_ENUM } = require('../models/User');
-const { generateInviteToken, hashValue } = require('../utils/security');
-const { sendMail } = require('../utils/email');
+const { generateTempPassword } = require('../utils/security');
+const { recordAudit } = require('../utils/auditLog');
+const { sanitizeUser } = require('../utils/sanitizeUser');
+const { createInvitedUser, buildLoginLink, sendInviteMail } = require('../utils/inviteUser');
+const { getRequestOrigin } = require('../utils/requestOrigin');
 
-const INVITE_EXPIRY_HOURS = Number(process.env.INVITE_EXPIRY_HOURS || 72);
+const USER_POPULATE_FIELDS = 'name email phone isActive passwordSet emailVerified';
 
-const sanitizeUser = (user) => ({
-  _id: user._id,
-  name: user.name,
-  email: user.email,
-  phone: user.phone ?? null,
-  role: user.role,
-  isActive: user.isActive,
-  passwordSet: user.passwordSet,
-  emailVerified: user.emailVerified,
-  inviteStatus: user.inviteStatus,
-  onboardingCompletedAt: user.onboardingCompletedAt,
-  invitedBy: user.invitedBy,
-  createdAt: user.createdAt,
-  updatedAt: user.updatedAt,
+// This entire file operates within req.builderId (see backend/middleware/tenantMiddleware.js) —
+// "user" here always means "member of the current builder org", i.e. a Membership row.
+// The :id route params below refer to a Membership id, not a User id, since a
+// person's role/status is scoped per builder, not global to their account.
+const sanitizeMembership = (membership) => ({
+  membershipId: membership._id,
+  role: membership.role,
+  status: membership.status,
+  inviteStatus: membership.inviteStatus,
+  invitedBy: membership.invitedBy,
+  activatedAt: membership.activatedAt,
+  createdAt: membership.createdAt,
+  updatedAt: membership.updatedAt,
+  user: membership.userId ? sanitizeUser(membership.userId) : null,
 });
 
-const buildInviteLink = (token) => {
-  const frontend = process.env.FRONTEND_URL || 'http://localhost:5173';
-  return `${frontend.replace(/\/$/, '')}/accept-invite/${token}`;
-};
-
-const sendInviteMail = async ({ email, name, role, inviteLink, expiresAt }) => {
-  const subject = 'You are invited to PropVault CRM';
-  const text = [
-    `Hello ${name},`,
-    '',
-    `You have been invited as ${role}.`,
-    `Set your password and verify OTP using this link: ${inviteLink}`,
-    `Invite expires at: ${expiresAt.toISOString()}`,
-  ].join('\n');
-
-  return sendMail({ to: email, subject, text });
-};
-
-// @desc  Get all users (admin only)
+// @desc  Get all members of the current builder org (builder_admin only)
 // @route GET /api/users
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find().sort({ createdAt: -1 });
-    res.json(users.map(sanitizeUser));
+    const memberships = await Membership.find({ builderId: req.builderId })
+      .sort({ createdAt: -1 })
+      .populate('userId', USER_POPULATE_FIELDS);
+    res.json(memberships.map(sanitizeMembership));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Get user by ID
+// @desc  Get one member of the current builder org by membership id
 // @route GET /api/users/:id
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(sanitizeUser(user));
+    const membership = await Membership.findOne({ _id: req.params.id, builderId: req.builderId }).populate(
+      'userId',
+      USER_POPULATE_FIELDS
+    );
+    if (!membership) return res.status(404).json({ message: 'User not found' });
+    res.json(sanitizeMembership(membership));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Update user
+// @desc  Update a member's role/status within the current builder org
 // @route PUT /api/users/:id
 const updateUser = async (req, res) => {
   try {
-    const { name, email, role, isActive, phone } = req.body;
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const { name, phone, role, isActive } = req.body;
+    const membership = await Membership.findOne({ _id: req.params.id, builderId: req.builderId }).populate(
+      'userId',
+      USER_POPULATE_FIELDS
+    );
+    if (!membership) return res.status(404).json({ message: 'User not found' });
 
-    if (role && !ROLE_ENUM.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role selected' });
+    if (role !== undefined) {
+      if (!ROLE_ENUM.includes(role)) {
+        return res.status(400).json({ message: 'Invalid role selected' });
+      }
+      membership.role = role;
     }
 
-    user.name = name ?? user.name;
-    user.email = email ?? user.email;
-    user.role = role ?? user.role;
-    user.isActive = isActive ?? user.isActive;
-    if (phone !== undefined) user.phone = phone;
+    if (isActive !== undefined) {
+      // Deactivating here revokes access to THIS org only — the account
+      // itself (and any other builder memberships it holds) is untouched.
+      membership.status = isActive ? 'active' : 'revoked';
+    }
 
-    const updated = await user.save();
-    res.json(sanitizeUser(updated));
+    await membership.save();
+
+    if (name !== undefined || phone !== undefined) {
+      if (name !== undefined) membership.userId.name = name;
+      if (phone !== undefined) membership.userId.phone = phone;
+      await membership.userId.save();
+    }
+
+    recordAudit({
+      builderId: req.builderId,
+      actor: req.user._id,
+      action: 'user_updated',
+      targetType: 'Membership',
+      targetId: membership._id,
+      metadata: { name, role, isActive },
+    });
+
+    res.json(sanitizeMembership(membership));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Delete user
+// @desc  Remove a member from the current builder org. This deletes the
+//        Membership only — the underlying account (and its access to any
+//        other builder org) is untouched.
 // @route DELETE /api/users/:id
 const deleteUser = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: 'User removed' });
+    const membership = await Membership.findOneAndDelete({ _id: req.params.id, builderId: req.builderId });
+    if (!membership) return res.status(404).json({ message: 'User not found' });
+
+    recordAudit({
+      builderId: req.builderId,
+      actor: req.user._id,
+      action: 'user_removed',
+      targetType: 'Membership',
+      targetId: membership._id,
+      metadata: {},
+    });
+
+    res.json({ message: 'User removed from organization' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Create user (admin only)
+// @desc  Invite a team member into the current builder org (builder_admin only)
 // @route POST /api/users
 const createUser = async (req, res) => {
   try {
@@ -112,97 +136,96 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid role selected' });
     }
 
-    const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: 'Email already registered' });
-
-    const inviteToken = generateInviteToken();
-    const inviteTokenHash = hashValue(inviteToken);
-    const inviteTokenExpiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
-
-    const user = await User.create({
+    const { user, membership, tempPassword, mailResult, joiningExistingAccount } = await createInvitedUser({
       name,
       email,
       role,
-      isActive: true,
-      passwordSet: false,
-      emailVerified: false,
-      inviteStatus: 'pending',
-      inviteTokenHash,
-      inviteTokenExpiresAt,
+      builderId: req.builderId,
       invitedBy: req.user._id,
+      origin: getRequestOrigin(req),
     });
 
-    const inviteLink = buildInviteLink(inviteToken);
-    const mailResult = await sendInviteMail({
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      inviteLink,
-      expiresAt: inviteTokenExpiresAt,
+    recordAudit({
+      builderId: req.builderId,
+      actor: req.user._id,
+      action: 'invite_created',
+      targetType: 'Membership',
+      targetId: membership._id,
+      metadata: { email: user.email, role },
     });
 
     res.status(201).json({
-      user: sanitizeUser(user),
+      user: sanitizeMembership({ ...membership.toObject(), userId: user }),
+      joiningExistingAccount,
       invite: {
-        expiresAt: inviteTokenExpiresAt,
         delivery: mailResult.sent ? 'email' : 'not_configured',
-        link: process.env.NODE_ENV === 'production' ? undefined : inviteLink,
+        // Dev convenience only — in production this only ever goes out by email.
+        username: process.env.NODE_ENV === 'production' ? undefined : user.email,
+        tempPassword: process.env.NODE_ENV === 'production' ? undefined : tempPassword,
       },
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message });
   }
 };
 
-// @desc  List pending invites
+// @desc  List pending invites for the current builder org
 // @route GET /api/users/invites/pending
 const getPendingInvites = async (req, res) => {
   try {
-    const users = await User.find({ inviteStatus: { $in: ['pending', 'pending_otp'] } }).sort({ createdAt: -1 });
-    res.json(users.map(sanitizeUser));
+    const memberships = await Membership.find({
+      builderId: req.builderId,
+      inviteStatus: 'pending',
+    })
+      .sort({ createdAt: -1 })
+      .populate('userId', USER_POPULATE_FIELDS);
+    res.json(memberships.map(sanitizeMembership));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// @desc  Resend invite for a user
+// @desc  Resend invite for a pending membership
 // @route POST /api/users/:id/resend-invite
 const resendInvite = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('+inviteTokenHash +inviteTokenExpiresAt');
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const membership = await Membership.findOne({ _id: req.params.id, builderId: req.builderId })
+      .populate('userId', USER_POPULATE_FIELDS)
+      .populate('builderId', 'name');
+    if (!membership) return res.status(404).json({ message: 'User not found' });
 
-    if (user.inviteStatus === 'accepted') {
+    if (membership.status === 'active') {
       return res.status(400).json({ message: 'User has already completed onboarding' });
     }
 
-    const inviteToken = generateInviteToken();
-    user.inviteTokenHash = hashValue(inviteToken);
-    user.inviteTokenExpiresAt = new Date(Date.now() + INVITE_EXPIRY_HOURS * 60 * 60 * 1000);
-    user.inviteStatus = 'pending';
-    user.passwordSet = false;
-    user.emailVerified = false;
-    user.otpCodeHash = null;
-    user.otpExpiresAt = null;
-    user.otpAttempts = 0;
-    user.otpLastSentAt = null;
+    const user = membership.userId;
+    const tempPassword = generateTempPassword();
+    user.password = tempPassword;
+    user.passwordSet = true;
+    user.mustChangePassword = true;
     await user.save();
 
-    const inviteLink = buildInviteLink(inviteToken);
+    membership.status = 'invited';
+    membership.inviteStatus = 'pending';
+    await membership.save();
+
+    const loginLink = buildLoginLink(getRequestOrigin(req));
     const mailResult = await sendInviteMail({
       email: user.email,
       name: user.name,
-      role: user.role,
-      inviteLink,
-      expiresAt: user.inviteTokenExpiresAt,
+      role: membership.role,
+      builderName: membership.builderId?.name,
+      tempPassword,
+      loginLink,
+      joiningExistingAccount: false,
     });
 
     res.json({
       message: 'Invite resent',
       invite: {
-        expiresAt: user.inviteTokenExpiresAt,
         delivery: mailResult.sent ? 'email' : 'not_configured',
-        link: process.env.NODE_ENV === 'production' ? undefined : inviteLink,
+        username: process.env.NODE_ENV === 'production' ? undefined : user.email,
+        tempPassword: process.env.NODE_ENV === 'production' ? undefined : tempPassword,
       },
     });
   } catch (err) {
@@ -210,25 +233,20 @@ const resendInvite = async (req, res) => {
   }
 };
 
-// @desc  Revoke invite for a user
+// @desc  Revoke a pending invite / membership
 // @route POST /api/users/:id/revoke-invite
 const revokeInvite = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const membership = await Membership.findOne({ _id: req.params.id, builderId: req.builderId });
+    if (!membership) return res.status(404).json({ message: 'User not found' });
 
-    if (user.inviteStatus === 'accepted') {
+    if (membership.status === 'active') {
       return res.status(400).json({ message: 'Cannot revoke an already accepted invite' });
     }
 
-    user.inviteStatus = 'revoked';
-    user.inviteTokenHash = null;
-    user.inviteTokenExpiresAt = null;
-    user.otpCodeHash = null;
-    user.otpExpiresAt = null;
-    user.otpAttempts = 0;
-    user.otpLastSentAt = null;
-    await user.save();
+    membership.status = 'revoked';
+    membership.inviteStatus = 'revoked';
+    await membership.save();
 
     res.json({ message: 'Invite revoked successfully' });
   } catch (err) {

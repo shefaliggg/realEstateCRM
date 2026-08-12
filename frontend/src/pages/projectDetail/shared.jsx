@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 export function Donut({ segments, size = 108, centerLabel, centerSub }) {
   const total = segments.reduce((sum, seg) => sum + (seg.value || 0), 0)
   let cumulative = 0
@@ -45,12 +47,28 @@ export function GaugeBar({ label, pct, color = 'bg-primary-500', icon, hint }) {
   )
 }
 
-export function PulseTile({ icon, label, value, tone = 'bg-primary-50 border-primary-100 text-primary-700' }) {
+export function StackedBar({ segments, total, height = 'h-3' }) {
+  const sum = total ?? segments.reduce((s, seg) => s + (seg.value || 0), 0)
   return (
-    <div className={`rounded-xl border p-3 text-center ${tone}`}>
+    <div className={`w-full ${height} rounded-full bg-gray-100 overflow-hidden flex`}>
+      {sum > 0 ? (
+        segments.filter((seg) => seg.value > 0).map((seg, i) => (
+          <div key={i} className={seg.color} style={{ width: `${(seg.value / sum) * 100}%` }} title={`${seg.label}: ${seg.value}`} />
+        ))
+      ) : (
+        <div className="w-full bg-gray-200" />
+      )}
+    </div>
+  )
+}
+
+export function PulseTile({ icon, label, value, tone = 'bg-primary-50 border-primary-100 text-primary-700', to }) {
+  const Tag = to ? Link : 'div'
+  return (
+    <Tag to={to} className={`rounded-xl border p-3 text-center ${tone} ${to ? 'block transition-transform hover:scale-[1.03] hover:shadow-sm' : ''}`}>
       <p className="text-2xl font-bold leading-none">{value}</p>
       <p className="mt-1.5 text-[10px] font-medium uppercase tracking-wide opacity-80">{icon} {label}</p>
-    </div>
+    </Tag>
   )
 }
 

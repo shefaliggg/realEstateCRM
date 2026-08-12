@@ -19,7 +19,7 @@ export default function ProfilePage() {
           </div>
           <div>
             <p className="text-xs text-gray-500">Role</p>
-            <p className="text-sm font-medium text-gray-900 capitalize">{user?.role ?? 'admin'}</p>
+            <p className="text-sm font-medium text-gray-900 capitalize">{user?.role?.replace(/_/g, ' ') ?? 'builder admin'}</p>
           </div>
         </div>
       </div>

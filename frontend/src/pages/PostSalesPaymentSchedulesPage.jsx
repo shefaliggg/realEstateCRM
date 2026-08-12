@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { getSchedules, saveSchedules, getBookings, getCustomers } from '../utils/postSalesStore'
+import { useEffect, useMemo, useState } from 'react'
+import api from '../api/axios'
+import { getSchedules, createSchedule, updateSchedule, getBookings } from '../api/postSalesApi'
 
 const inputClass = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
@@ -10,63 +11,101 @@ const STATUS_COLORS = {
 }
 
 function fmt(n) {
-  return '₹' + Number(n).toLocaleString('en-IN')
+  return '₹' + Number(n || 0).toLocaleString('en-IN')
 }
 
 export default function PostSalesPaymentSchedulesPage() {
-  const [schedules, setSchedules] = useState(getSchedules)
-  const bookings = getBookings()
-  const customers = getCustomers()
+  const [schedules, setSchedules] = useState([])
+  const [bookings, setBookings] = useState([])
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [busyId, setBusyId] = useState(null)
 
   const [bookingFilter, setBookingFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ bookingId: '', label: '', dueDate: '', amount: '' })
+  const [form, setForm] = useState({ booking: '', label: '', dueDate: '', amount: '' })
 
-  // Auto-derive Overdue
-  const today = new Date().toISOString().slice(0, 10)
-  const enriched = schedules.map((s) =>
-    s.status === 'Pending' && s.dueDate < today ? { ...s, status: 'Overdue' } : s,
-  )
+  const projectById = useMemo(() => new Map(projects.map((p) => [p._id, p])), [projects])
 
+  const refresh = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [schedulesData, bookingsData, projectsRes] = await Promise.all([
+        getSchedules(),
+        getBookings(),
+        api.get('/projects'),
+      ])
+      setSchedules(schedulesData)
+      setBookings(bookingsData)
+      setProjects(projectsRes.data || [])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load payment schedules')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  // The real getSchedules already returns effective status (Pending past its
+  // due date comes back as Overdue) — see backend/controllers/paymentScheduleController.js.
   const filtered = useMemo(() => {
-    return enriched.filter((s) => {
-      if (bookingFilter && s.bookingId !== bookingFilter) return false
+    return schedules.filter((s) => {
+      if (bookingFilter && (s.booking?._id || s.booking) !== bookingFilter) return false
       if (statusFilter !== 'All' && s.status !== statusFilter) return false
       return true
     })
-  }, [enriched, bookingFilter, statusFilter])
+  }, [schedules, bookingFilter, statusFilter])
 
-  const totalAmount = filtered.reduce((a, s) => a + Number(s.amount), 0)
-  const paidAmount = filtered.filter((s) => s.status === 'Paid').reduce((a, s) => a + Number(s.amount), 0)
+  const totalAmount = filtered.reduce((a, s) => a + Number(s.amount || 0), 0)
+  const paidAmount = filtered.filter((s) => s.status === 'Paid').reduce((a, s) => a + Number(s.amount || 0), 0)
 
-  const markPaid = (id) => {
-    const next = schedules.map((s) => (s.id === id ? { ...s, status: 'Paid' } : s))
-    setSchedules(next)
-    saveSchedules(next)
+  const bookingLabel = (b) => `${b.customer?.name || 'Unknown'} — ${b.unit?.block || ''} ${b.unit?.unitNo || ''}`.trim()
+
+  const markPaid = async (id) => {
+    setBusyId(id)
+    setError('')
+    try {
+      await updateSchedule(id, { status: 'Paid' })
+      await refresh()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update milestone')
+    } finally {
+      setBusyId(null)
+    }
   }
 
-  const addSchedule = (e) => {
+  const addSchedule = async (e) => {
     e.preventDefault()
-    const bk = bookings.find((b) => b.id === form.bookingId)
-    if (!bk || !form.label || !form.dueDate || !form.amount) return
-    const next = [
-      ...schedules,
-      {
-        id: `sch-${Date.now()}`,
-        bookingId: bk.id,
-        customerName: bk.customerName,
-        projectName: bk.projectName,
+    setError('')
+    const booking = bookings.find((b) => b._id === form.booking)
+    if (!booking || !form.label || !form.dueDate || !form.amount) {
+      setError('Booking, label, due date and amount are required')
+      return
+    }
+    setSaving(true)
+    try {
+      await createSchedule({
+        booking: booking._id,
+        project: booking.project?._id || booking.project,
         label: form.label,
         dueDate: form.dueDate,
         amount: Number(form.amount),
-        status: 'Pending',
-      },
-    ]
-    setSchedules(next)
-    saveSchedules(next)
-    setShowAdd(false)
-    setForm({ bookingId: '', label: '', dueDate: '', amount: '' })
+      })
+      setShowAdd(false)
+      setForm({ booking: '', label: '', dueDate: '', amount: '' })
+      await refresh()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to add milestone')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -85,13 +124,15 @@ export default function PostSalesPaymentSchedulesPage() {
         </button>
       </div>
 
+      {error && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Milestones', value: enriched.length, color: 'text-gray-800' },
-          { label: 'Paid', value: enriched.filter((s) => s.status === 'Paid').length, color: 'text-green-600' },
-          { label: 'Pending', value: enriched.filter((s) => s.status === 'Pending').length, color: 'text-yellow-600' },
-          { label: 'Overdue', value: enriched.filter((s) => s.status === 'Overdue').length, color: 'text-red-600' },
+          { label: 'Total Milestones', value: schedules.length, color: 'text-gray-800' },
+          { label: 'Paid', value: schedules.filter((s) => s.status === 'Paid').length, color: 'text-green-600' },
+          { label: 'Pending', value: schedules.filter((s) => s.status === 'Pending').length, color: 'text-yellow-600' },
+          { label: 'Overdue', value: schedules.filter((s) => s.status === 'Overdue').length, color: 'text-red-600' },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs text-gray-500">{s.label}</p>
@@ -109,9 +150,7 @@ export default function PostSalesPaymentSchedulesPage() {
         >
           <option value="">All Bookings</option>
           {bookings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.customerName} — {b.projectName} {b.unitNumber}
-            </option>
+            <option key={b._id} value={b._id}>{bookingLabel(b)}</option>
           ))}
         </select>
         <select className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -139,15 +178,18 @@ export default function PostSalesPaymentSchedulesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 && (
+              {loading && (
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">Loading…</td></tr>
+              )}
+              {!loading && filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No milestones found.</td></tr>
               )}
-              {filtered.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50 transition">
-                  <td className="px-4 py-3 font-medium text-gray-800">{s.customerName}</td>
-                  <td className="px-4 py-3 text-gray-600">{s.projectName}</td>
+              {!loading && filtered.map((s) => (
+                <tr key={s._id} className="hover:bg-gray-50 transition">
+                  <td className="px-4 py-3 font-medium text-gray-800">{s.booking?.customer?.name || '-'}</td>
+                  <td className="px-4 py-3 text-gray-600">{projectById.get(s.project)?.name || '-'}</td>
                   <td className="px-4 py-3 text-gray-700">{s.label}</td>
-                  <td className="px-4 py-3 text-gray-500">{s.dueDate}</td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(s.dueDate).toLocaleDateString()}</td>
                   <td className="px-4 py-3 font-medium text-gray-800">{fmt(s.amount)}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[s.status]}`}>
@@ -157,8 +199,9 @@ export default function PostSalesPaymentSchedulesPage() {
                   <td className="px-4 py-3">
                     {s.status !== 'Paid' && (
                       <button
-                        onClick={() => markPaid(s.id)}
-                        className="text-xs text-green-600 hover:underline font-medium"
+                        disabled={busyId === s._id}
+                        onClick={() => markPaid(s._id)}
+                        className="text-xs text-green-600 hover:underline font-medium disabled:opacity-50"
                       >
                         Mark Paid
                       </button>
@@ -179,10 +222,10 @@ export default function PostSalesPaymentSchedulesPage() {
             <form onSubmit={addSchedule} className="space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Booking *</label>
-                <select className={inputClass} required value={form.bookingId} onChange={(e) => setForm({ ...form, bookingId: e.target.value })}>
+                <select className={inputClass} required value={form.booking} onChange={(e) => setForm({ ...form, booking: e.target.value })}>
                   <option value="">Select booking…</option>
                   {bookings.map((b) => (
-                    <option key={b.id} value={b.id}>{b.customerName} — {b.projectName} {b.unitNumber}</option>
+                    <option key={b._id} value={b._id}>{bookingLabel(b)}</option>
                   ))}
                 </select>
               </div>
@@ -200,7 +243,9 @@ export default function PostSalesPaymentSchedulesPage() {
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium">Save</button>
+                <button type="submit" disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium disabled:opacity-50">
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </form>
           </div>

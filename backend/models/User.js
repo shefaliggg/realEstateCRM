@@ -2,14 +2,26 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const ROLE_ENUM = [
-  'admin',
+  'builder_admin',
   'sales_manager',
   'sales_executive',
   'crm_manager',
   'crm_executive',
   'marketing_manager',
   'marketing_executive',
+  'partner_admin',
+  'partner_agent',
+  'customer',
+  // Legacy value — replaced by partner_admin/partner_agent. Kept in the enum
+  // (never removed) so pre-existing Membership docs stay schema-valid;
+  // attachTenantScope (backend/middleware/tenantMiddleware.js) lazily
+  // upgrades any membership still on this value to partner_admin on read.
+  'channel_partner',
 ];
+
+const PLATFORM_ROLE_ENUM = ['platform_admin', 'platform_staff'];
+
+const isPlatformRole = (role) => PLATFORM_ROLE_ENUM.includes(role);
 
 const userSchema = new mongoose.Schema(
   {
@@ -31,9 +43,11 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
     role: {
+      // Only meaningful for platform-tier accounts (platform_admin/platform_staff).
+      // Org-tier accounts read their effective role off the active Membership instead.
       type: String,
-      enum: ROLE_ENUM,
-      default: 'sales_executive',
+      enum: [...ROLE_ENUM, ...PLATFORM_ROLE_ENUM],
+      default: null,
     },
     isActive: {
       type: Boolean,
@@ -43,49 +57,15 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    emailVerified: {
+    // True from account creation (temp password issued) until the user
+    // completes the forced set-new-password step on their first login.
+    mustChangePassword: {
       type: Boolean,
       default: false,
     },
-    inviteTokenHash: {
-      type: String,
-      default: null,
-      select: false,
-    },
-    inviteTokenExpiresAt: {
-      type: Date,
-      default: null,
-      select: false,
-    },
-    inviteStatus: {
-      type: String,
-      enum: ['none', 'pending', 'pending_otp', 'accepted', 'revoked', 'expired'],
-      default: 'none',
-    },
-    invitedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      default: null,
-    },
-    otpCodeHash: {
-      type: String,
-      default: null,
-      select: false,
-    },
-    otpExpiresAt: {
-      type: Date,
-      default: null,
-      select: false,
-    },
-    otpAttempts: {
-      type: Number,
-      default: 0,
-      select: false,
-    },
-    otpLastSentAt: {
-      type: Date,
-      default: null,
-      select: false,
+    emailVerified: {
+      type: Boolean,
+      default: false,
     },
     onboardingCompletedAt: {
       type: Date,
@@ -118,3 +98,5 @@ const User = mongoose.model('User', userSchema);
 
 module.exports = User;
 module.exports.ROLE_ENUM = ROLE_ENUM;
+module.exports.PLATFORM_ROLE_ENUM = PLATFORM_ROLE_ENUM;
+module.exports.isPlatformRole = isPlatformRole;

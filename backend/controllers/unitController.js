@@ -1,4 +1,5 @@
 const Unit = require('../models/Unit')
+const Project = require('../models/Project')
 
 const uploadedFileUrl = (bucket) =>
   bucket && bucket[0] ? `/uploads/project-images/${bucket[0].filename}` : undefined
@@ -34,7 +35,7 @@ const normalizeUnitBody = (body, files = {}) => {
 
 const getUnits = async (req, res) => {
   try {
-    const filter = { project: req.params.projectId }
+    const filter = { project: req.params.projectId, builderId: req.builderId }
     if (req.query.block) filter.block = req.query.block
     if (req.query.status) filter.status = req.query.status
     if (req.query.bhkType) filter.bhkType = req.query.bhkType
@@ -47,7 +48,7 @@ const getUnits = async (req, res) => {
 
 const getUnitById = async (req, res) => {
   try {
-    const unit = await Unit.findById(req.params.id)
+    const unit = await Unit.findOne({ _id: req.params.id, builderId: req.builderId })
       .populate('project', 'name type location')
       .populate('currentLead', 'name phone email nurtureStage')
       .populate('currentDeal', 'dealName stage value probability')
@@ -60,8 +61,11 @@ const getUnitById = async (req, res) => {
 
 const createUnit = async (req, res) => {
   try {
+    const project = await Project.findOne({ _id: req.params.projectId, builderId: req.builderId })
+    if (!project) return res.status(404).json({ message: 'Project not found' })
+
     const payload = normalizeUnitBody(req.body, req.files || {})
-    const unit = new Unit({ ...payload, project: req.params.projectId })
+    const unit = new Unit({ ...payload, project: req.params.projectId, builderId: req.builderId })
     await unit.save()
     res.status(201).json(unit)
   } catch (err) {
@@ -73,7 +77,7 @@ const createUnit = async (req, res) => {
 const updateUnit = async (req, res) => {
   try {
     const payload = normalizeUnitBody(req.body, req.files || {})
-    const unit = await Unit.findById(req.params.id)
+    const unit = await Unit.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!unit) return res.status(404).json({ message: 'Unit not found' })
     Object.entries(payload).forEach(([key, value]) => {
       if (key === 'documents') unit.documents = { ...(unit.documents?.toObject?.() || unit.documents || {}), ...value }
@@ -88,7 +92,7 @@ const updateUnit = async (req, res) => {
 
 const deleteUnit = async (req, res) => {
   try {
-    const unit = await Unit.findByIdAndDelete(req.params.id)
+    const unit = await Unit.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!unit) return res.status(404).json({ message: 'Unit not found' })
     res.json({ message: 'Unit deleted' })
   } catch (err) {
@@ -111,8 +115,11 @@ const bulkCreateUnits = async (req, res) => {
     if (!Array.isArray(units) || units.length === 0) {
       return res.status(400).json({ message: 'units array is required' })
     }
+    const project = await Project.findOne({ _id: req.params.projectId, builderId: req.builderId })
+    if (!project) return res.status(404).json({ message: 'Project not found' })
+
     // insertMany doesn't run the pre('save') hook, so totalPrice is computed here instead
-    const docs = units.map((u) => ({ ...u, project: req.params.projectId, totalPrice: computeTotalPrice(u) }))
+    const docs = units.map((u) => ({ ...u, project: req.params.projectId, builderId: req.builderId, totalPrice: computeTotalPrice(u) }))
     const created = await Unit.insertMany(docs, { ordered: false })
     res.status(201).json({ message: `${created.length} unit(s) created`, units: created })
   } catch (err) {
@@ -133,7 +140,7 @@ const bulkUpdateUnits = async (req, res) => {
     }
 
     const pricingKeys = ['basePrice', 'pricePerSqft', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges']
-    const units = await Unit.find({ _id: { $in: unitIds } })
+    const units = await Unit.find({ _id: { $in: unitIds }, builderId: req.builderId })
 
     await Promise.all(
       units.map(async (unit) => {

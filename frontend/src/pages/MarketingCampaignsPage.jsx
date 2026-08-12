@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getCampaigns } from '../utils/marketingCampaignStore'
+import { generateAdCopy } from '../api/aiApi'
 
 function formatDate(value) {
   if (!value) return '-'
@@ -10,6 +12,20 @@ function formatDate(value) {
 
 export default function MarketingCampaignsPage() {
   const campaigns = getCampaigns()
+  const [adCopy, setAdCopy] = useState(null)
+  const [adCopyLoading, setAdCopyLoading] = useState(false)
+
+  const handleGenerateAdCopy = async () => {
+    setAdCopyLoading(true)
+    try {
+      const result = await generateAdCopy({})
+      setAdCopy(result)
+    } catch {
+      setAdCopy({ headline: 'Could not generate ad copy right now.', body: '' })
+    } finally {
+      setAdCopyLoading(false)
+    }
+  }
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -20,13 +36,30 @@ export default function MarketingCampaignsPage() {
             Create digital marketing campaigns with guided business and audience discovery.
           </p>
         </div>
-        <Link
-          to="/marketing/campaigns/create"
-          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
-        >
-          + New Campaign
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGenerateAdCopy}
+            disabled={adCopyLoading}
+            className="text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {adCopyLoading ? 'Generating…' : '✨ Generate Ad Copy (AI)'}
+          </button>
+          <Link
+            to="/marketing/campaigns/create"
+            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          >
+            + New Campaign
+          </Link>
+        </div>
       </div>
+
+      {adCopy && (
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+          <p className="text-xs font-semibold text-amber-600 mb-2">Simulated AI response (Phase 1)</p>
+          <p className="font-semibold text-gray-900">{adCopy.headline}</p>
+          {adCopy.body && <p className="text-sm text-gray-600 mt-1">{adCopy.body}</p>}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">

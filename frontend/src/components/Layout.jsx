@@ -1,6 +1,8 @@
-﻿import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import Sidebar from './Sidebar'
+import TopBar from './TopBar'
+import GlobalAssistantPanel from './GlobalAssistantPanel'
 
 const LayoutDepthContext = createContext(false)
 
@@ -9,6 +11,7 @@ export default function Layout({ children }) {
   if (isNestedLayout) return children
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const { user, logout } = useAuth()
 
   return (
@@ -21,19 +24,12 @@ export default function Layout({ children }) {
           onLogout={logout}
         />
 
-        <div className="flex-1 min-w-0 overflow-hidden relative">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden absolute top-3 left-3 z-10 p-2 rounded-lg bg-white border border-gray-200 text-gray-600 shadow-sm"
-            aria-label="Open menu"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          <main className="h-full overflow-y-auto">{children}</main>
+        <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <TopBar onOpenSidebar={() => setSidebarOpen(true)} onOpenAssistant={() => setAssistantOpen(true)} />
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </div>
+
+        <GlobalAssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} />
       </div>
     </LayoutDepthContext.Provider>
   )

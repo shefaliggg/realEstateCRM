@@ -1,9 +1,12 @@
 const express = require('express')
 const router = express.Router()
-const { protect } = require('../middleware/authMiddleware')
+const { protect, blockExternalUsers, requirePermission } = require('../middleware/authMiddleware')
+const { attachTenantScope, requireBuilderScope } = require('../middleware/tenantMiddleware')
 const { getSchedules, createSchedule, updateSchedule, deleteSchedule } = require('../controllers/paymentScheduleController')
 
-router.route('/').get(protect, getSchedules).post(protect, createSchedule)
-router.route('/:id').put(protect, updateSchedule).delete(protect, deleteSchedule)
+router.use(protect, attachTenantScope, requireBuilderScope, blockExternalUsers, requirePermission('module:Post-Sales'))
+
+router.route('/').get(getSchedules).post(createSchedule)
+router.route('/:id').put(updateSchedule).delete(deleteSchedule)
 
 module.exports = router

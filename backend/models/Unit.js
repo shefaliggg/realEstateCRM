@@ -9,6 +9,7 @@ const statusHistorySchema = new mongoose.Schema({
 
 const unitSchema = new mongoose.Schema(
   {
+    builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder', required: true, index: true },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     block: { type: String, required: true, trim: true },      // A, B, C ...
     floor: { type: Number, required: true },

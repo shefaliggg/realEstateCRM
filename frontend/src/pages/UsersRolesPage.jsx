@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const ROLES = [
-  'admin',
+  'builder_admin',
   'sales_manager',
   'sales_executive',
   'crm_manager',
@@ -52,27 +52,29 @@ export default function UsersRolesPage() {
   }, [])
 
   const pendingInviteMap = useMemo(() => {
-    const map = new Set(pendingInvites.map((u) => u._id))
+    const map = new Set(pendingInvites.map((m) => m.membershipId))
     return map
   }, [pendingInvites])
 
+  // getUsers()/getPendingInvites() return Membership rows (role/status are
+  // per-org, not on the account) with the account nested at `.user`.
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
 
-    return users.filter((u) => {
+    return users.filter((m) => {
       const matchesSearch =
         !q ||
-        u.name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q)
+        m.user?.name?.toLowerCase().includes(q) ||
+        m.user?.email?.toLowerCase().includes(q)
 
-      const matchesRole = roleFilter === 'all' || u.role === roleFilter
+      const matchesRole = roleFilter === 'all' || m.role === roleFilter
 
       const matchesStatus =
         statusFilter === 'all' ||
-        (statusFilter === 'active' && u.isActive) ||
-        (statusFilter === 'inactive' && !u.isActive)
+        (statusFilter === 'active' && m.user?.isActive) ||
+        (statusFilter === 'inactive' && !m.user?.isActive)
 
-      const matchesInvite = inviteFilter === 'all' || (u.inviteStatus || 'none') === inviteFilter
+      const matchesInvite = inviteFilter === 'all' || (m.inviteStatus || 'none') === inviteFilter
 
       return matchesSearch && matchesRole && matchesStatus && matchesInvite
     })
@@ -91,8 +93,8 @@ export default function UsersRolesPage() {
     try {
       const result = await createUserInvite(form)
       setMessage(
-        result.invite?.link
-          ? `User created. Dev invite link: ${result.invite.link}`
+        result.invite?.tempPassword
+          ? `User created. Dev temp password for ${result.invite.username}: ${result.invite.tempPassword}`
           : 'User created and invite sent.'
       )
       setForm({ name: '', email: '', role: 'sales_executive' })
@@ -109,8 +111,8 @@ export default function UsersRolesPage() {
     try {
       const result = await resendUserInvite(id)
       setMessage(
-        result.invite?.link
-          ? `Invite resent. Dev invite link: ${result.invite.link}`
+        result.invite?.tempPassword
+          ? `Invite resent. Dev temp password for ${result.invite.username}: ${result.invite.tempPassword}`
           : 'Invite resent successfully.'
       )
       await refresh()
@@ -208,10 +210,8 @@ export default function UsersRolesPage() {
             <option value="all">All Invite Status</option>
             <option value="none">none</option>
             <option value="pending">pending</option>
-            <option value="pending_otp">pending_otp</option>
             <option value="accepted">accepted</option>
             <option value="revoked">revoked</option>
-            <option value="expired">expired</option>
           </select>
         </div>
 
@@ -231,44 +231,44 @@ export default function UsersRolesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
-                  <tr key={user._id} className="border-b last:border-b-0">
-                    <td className="py-2 pr-4 text-gray-900">{user.name}</td>
-                    <td className="py-2 pr-4 text-gray-700">{user.email}</td>
-                    <td className="py-2 pr-4 text-gray-700">{user.role}</td>
+                {filteredUsers.map((member) => (
+                  <tr key={member.membershipId} className="border-b last:border-b-0">
+                    <td className="py-2 pr-4 text-gray-900">{member.user?.name}</td>
+                    <td className="py-2 pr-4 text-gray-700">{member.user?.email}</td>
+                    <td className="py-2 pr-4 text-gray-700">{member.role}</td>
                     <td className="py-2 pr-4">
                       <span
                         className={`px-2 py-1 rounded-full text-xs ${
-                          user.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
+                          member.user?.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-700'
                         }`}
                       >
-                        {user.isActive ? 'Active' : 'Inactive'}
+                        {member.user?.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-gray-700">{user.inviteStatus || 'none'}</td>
+                    <td className="py-2 pr-4 text-gray-700">{member.inviteStatus || 'none'}</td>
                     <td className="py-2">
                       <div className="flex flex-wrap gap-2">
                         <Link
-                          to={`/users/${user._id}`}
+                          to={`/users/${member.membershipId}`}
                           className="px-2 py-1 rounded bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs"
                         >
                           View
                         </Link>
-                        {pendingInviteMap.has(user._id) && (
+                        {pendingInviteMap.has(member.membershipId) && (
                           <>
                             <button
                               type="button"
                               className="px-2 py-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs"
-                              disabled={busyUserId === user._id}
-                              onClick={() => onResendInvite(user._id)}
+                              disabled={busyUserId === member.membershipId}
+                              onClick={() => onResendInvite(member.membershipId)}
                             >
                               Resend Invite
                             </button>
                             <button
                               type="button"
                               className="px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700 text-xs"
-                              disabled={busyUserId === user._id}
-                              onClick={() => onRevokeInvite(user._id)}
+                              disabled={busyUserId === member.membershipId}
+                              onClick={() => onRevokeInvite(member.membershipId)}
                             >
                               Revoke Invite
                             </button>

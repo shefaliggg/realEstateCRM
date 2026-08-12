@@ -44,7 +44,8 @@ const EMPTY_FORM = {
 }
 
 export default function AddTowerPage() {
-  const { projectId } = useParams()
+  const { projectId, towerId } = useParams()
+  const isEdit = Boolean(towerId)
   const navigate = useNavigate()
   const [project, setProject] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -57,6 +58,26 @@ export default function AddTowerPage() {
     api.get(`/projects/${projectId}`).then((r) => setProject(r.data)).catch(() => {})
     api.get('/users').then((r) => setUsers(r.data)).catch(() => {})
   }, [projectId])
+
+  useEffect(() => {
+    if (!isEdit) return
+    api.get(`/towers/${towerId}`).then((r) => {
+      const t = r.data
+      setForm({
+        name: t.name || '', code: t.code || '', status: t.status || 'Planned',
+        numberOfFloors: t.numberOfFloors ?? '', numberOfBasements: t.numberOfBasements ?? '', numberOfLifts: t.numberOfLifts ?? '', numberOfFlats: t.numberOfFlats ?? '',
+        possessionDate: t.possessionDate ? t.possessionDate.slice(0, 10) : '',
+        constructionStartDate: t.constructionStartDate ? t.constructionStartDate.slice(0, 10) : '',
+        completionDate: t.completionDate ? t.completionDate.slice(0, 10) : '',
+        occupancyCertificate: Boolean(t.occupancyCertificate), fireNOC: Boolean(t.fireNOC),
+        serviceLift: Boolean(t.features?.serviceLift), passengerLift: Boolean(t.features?.passengerLift),
+        generatorBackup: Boolean(t.features?.generatorBackup), cctv: Boolean(t.features?.cctv),
+        fireSafety: Boolean(t.features?.fireSafety), garbageChute: Boolean(t.features?.garbageChute),
+        wheelchairAccess: Boolean(t.features?.wheelchairAccess),
+        siteEngineer: t.siteEngineer?._id || '', salesManager: t.salesManager?._id || '',
+      })
+    }).catch(() => setError('Failed to load tower'))
+  }, [isEdit, towerId])
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
   const onChange = (key) => (e) => set(key, e.target.value)
@@ -88,11 +109,14 @@ export default function AddTowerPage() {
       if (files.elevationDrawing) fd.append('elevationDrawing', files.elevationDrawing)
       files.floorPlans.forEach((f) => fd.append('floorPlans', f))
 
-      const res = await api.post(`/projects/${projectId}/towers`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      if (isEdit) {
+        await api.put(`/projects/${projectId}/towers/${towerId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      } else {
+        await api.post(`/projects/${projectId}/towers`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      }
       navigate(`/projects/${projectId}`)
-      void res
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create tower')
+      setError(err.response?.data?.message || `Failed to ${isEdit ? 'update' : 'create'} tower`)
     } finally {
       setLoading(false)
     }
@@ -103,10 +127,10 @@ export default function AddTowerPage() {
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <Link to={`/projects/${projectId}`} className="hover:text-primary-600">{project?.name || 'Project'}</Link>
         <span>/</span>
-        <span className="text-gray-900 font-medium">Add Tower</span>
+        <span className="text-gray-900 font-medium">{isEdit ? 'Edit Tower' : 'Add Tower'}</span>
       </div>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">🏢 Add Tower</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">🏢 {isEdit ? 'Edit Tower' : 'Add Tower'}</h1>
 
       {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-4 text-sm">{error}</div>}
 
@@ -196,7 +220,7 @@ export default function AddTowerPage() {
 
         <div className="flex gap-3">
           <button type="submit" disabled={loading} className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-            {loading ? 'Creating...' : 'Create Tower'}
+            {loading ? (isEdit ? 'Saving...' : 'Creating...') : isEdit ? 'Save Changes' : 'Create Tower'}
           </button>
           <Link to={`/projects/${projectId}`} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
             Cancel

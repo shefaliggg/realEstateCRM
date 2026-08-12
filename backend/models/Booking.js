@@ -2,6 +2,7 @@ const mongoose = require('mongoose')
 
 const bookingSchema = new mongoose.Schema(
   {
+    builderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Builder', required: true, index: true },
     project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true },
     unit: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit', required: true },
     customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
@@ -14,6 +15,7 @@ const bookingSchema = new mongoose.Schema(
       default: 'Active',
     },
     bookedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    channelPartner: { type: mongoose.Schema.Types.ObjectId, ref: 'ChannelPartner', default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }

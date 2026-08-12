@@ -21,28 +21,55 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password })
+    if (data.requiresPasswordChange) {
+      // Account is still on its invite's temporary password — no session yet,
+      // the caller must collect a new password and call setPassword below.
+      return data
+    }
+    if (data.requiresBuilderSelection) {
+      // More than one active organization membership — stash the short-lived
+      // preToken so the follow-up select-builder call is authenticated, but
+      // don't treat this as a real session yet (no `user` in localStorage).
+      localStorage.setItem('token', data.preToken)
+      return data
+    }
     storeSession(data)
     return data
   }, [storeSession])
 
-  const validateInvite = useCallback(async (token) => {
-    const { data } = await api.get(`/auth/invite/${token}`)
+  const setPassword = useCallback(async (resetToken, newPassword) => {
+    const { data } = await api.post('/auth/set-password', { resetToken, newPassword })
+    if (data.requiresBuilderSelection) {
+      // Same bridge as login's multi-org case — stash the preToken and let
+      // the caller prompt for select-builder next.
+      localStorage.setItem('token', data.preToken)
+    } else {
+      storeSession(data)
+    }
     return data
-  }, [])
+  }, [storeSession])
 
-  const acceptInvite = useCallback(async (token, password) => {
-    const { data } = await api.post('/auth/invite/accept', { token, password })
-    return data
-  }, [])
-
-  const verifyInviteOtp = useCallback(async (token, otp) => {
-    const { data } = await api.post('/auth/invite/verify-otp', { token, otp })
+  const selectBuilder = useCallback(async (builderId) => {
+    const { data } = await api.post('/auth/select-builder', { builderId })
     storeSession(data)
     return data
   }, [storeSession])
 
-  const resendInviteOtp = useCallback(async (token) => {
-    const { data } = await api.post('/auth/invite/resend-otp', { token })
+  const getMyMemberships = useCallback(async () => {
+    const { data } = await api.get('/auth/memberships')
+    return data
+  }, [])
+
+  // Re-fetches the current session (role, builder, permissions) without a
+  // full re-login — used after an admin edits their own role's permissions
+  // so the change is reflected immediately instead of on next login.
+  const refreshUser = useCallback(async () => {
+    const { data } = await api.get('/auth/me')
+    setUser((prev) => {
+      const next = { ...prev, ...data }
+      localStorage.setItem('user', JSON.stringify(next))
+      return next
+    })
     return data
   }, [])
 
@@ -87,11 +114,11 @@ export function AuthProvider({ children }) {
       value={{
         user,
         login,
+        setPassword,
+        selectBuilder,
+        getMyMemberships,
+        refreshUser,
         logout,
-        validateInvite,
-        acceptInvite,
-        verifyInviteOtp,
-        resendInviteOtp,
         createUserInvite,
         getUsers,
         getPendingInvites,

@@ -1,10 +1,18 @@
 const Deal = require('../models/Deal')
 const Unit = require('../models/Unit')
+const Lead = require('../models/Lead')
 
 const getDeals = async (req, res) => {
   try {
-    const filter = {}
+    const filter = { builderId: req.builderId }
     if (req.query.stage) filter.stage = req.query.stage
+    if (req.query.hasPartner === 'true') filter.channelPartner = { $ne: null }
+    if (req.query.channelPartner) filter.channelPartner = req.query.channelPartner
+    if (req.query.assignedTo) filter.assignedTo = req.query.assignedTo
+    if (req.query.project) {
+      const unitIds = await Unit.find({ project: req.query.project }).distinct('_id')
+      filter.unit = { $in: unitIds }
+    }
     const deals = await Deal.find(filter)
       .populate({ path: 'unit', select: 'block floor unitNo bhkType status', populate: { path: 'project', select: 'name' } })
       .populate('lead', 'name phone email nurtureStage')
@@ -18,7 +26,7 @@ const getDeals = async (req, res) => {
 
 const getDealById = async (req, res) => {
   try {
-    const deal = await Deal.findById(req.params.id)
+    const deal = await Deal.findOne({ _id: req.params.id, builderId: req.builderId })
       .populate({ path: 'unit', select: 'block floor unitNo bhkType carpetArea basePrice status', populate: { path: 'project', select: 'name location' } })
       .populate('lead', 'name phone email nurtureStage budget unitInterest')
       .populate('assignedTo', 'name email')
@@ -31,7 +39,11 @@ const getDealById = async (req, res) => {
 
 const createDeal = async (req, res) => {
   try {
-    const deal = new Deal({ ...req.body, createdBy: req.user._id })
+    const deal = new Deal({ ...req.body, createdBy: req.user._id, builderId: req.builderId })
+    if (!deal.channelPartner && deal.lead) {
+      const lead = await Lead.findOne({ _id: deal.lead, builderId: req.builderId }).select('channelPartner')
+      if (lead?.channelPartner) deal.channelPartner = lead.channelPartner
+    }
     await deal.save()
     // Mark unit as Reserved when deal is created
     await Unit.findByIdAndUpdate(req.body.unit, {
@@ -46,10 +58,10 @@ const createDeal = async (req, res) => {
 
 const updateDeal = async (req, res) => {
   try {
-    const existing = await Deal.findById(req.params.id)
+    const existing = await Deal.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!existing) return res.status(404).json({ message: 'Deal not found' })
 
-    const deal = await Deal.findByIdAndUpdate(req.params.id, req.body, {
+    const deal = await Deal.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, req.body, {
       new: true,
       runValidators: true,
     })
@@ -74,7 +86,7 @@ const updateDeal = async (req, res) => {
 
 const deleteDeal = async (req, res) => {
   try {
-    const deal = await Deal.findByIdAndDelete(req.params.id)
+    const deal = await Deal.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!deal) return res.status(404).json({ message: 'Deal not found' })
     // Release unit back to Available if it was only Reserved
     await Unit.findOneAndUpdate(

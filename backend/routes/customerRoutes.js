@@ -1,9 +1,13 @@
 const express = require('express')
 const router = express.Router()
-const { protect } = require('../middleware/authMiddleware')
-const { getCustomers, getCustomerById, createCustomer, updateCustomer, deleteCustomer } = require('../controllers/customerController')
+const { protect, blockExternalUsers, requirePermission } = require('../middleware/authMiddleware')
+const { attachTenantScope, requireBuilderScope } = require('../middleware/tenantMiddleware')
+const { getCustomers, getCustomerById, createCustomer, updateCustomer, deleteCustomer, inviteCustomer } = require('../controllers/customerController')
 
-router.route('/').get(protect, getCustomers).post(protect, createCustomer)
-router.route('/:id').get(protect, getCustomerById).put(protect, updateCustomer).delete(protect, deleteCustomer)
+router.use(protect, attachTenantScope, requireBuilderScope, blockExternalUsers, requirePermission('module:Post-Sales'))
+
+router.route('/').get(getCustomers).post(createCustomer)
+router.route('/:id').get(getCustomerById).put(updateCustomer).delete(deleteCustomer)
+router.post('/:id/invite', inviteCustomer)
 
 module.exports = router

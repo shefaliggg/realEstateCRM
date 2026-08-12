@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 
 const STAGE_STYLES = {
@@ -15,6 +15,9 @@ const STAGE_STYLES = {
 const STAGES = ['All', 'Lead Qualification', 'Needs Analysis', 'Proposal Sent', 'Negotiation', 'Contract Review', 'Won', 'Lost']
 
 export default function AllDealsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const projectFilter = searchParams.get('project') || ''
+  const [projectName, setProjectName] = useState('')
   const [deals, setDeals] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -22,11 +25,23 @@ export default function AllDealsPage() {
   const [filterStage, setFilterStage] = useState('All')
 
   useEffect(() => {
-    api.get('/deals')
+    setLoading(true)
+    api.get(projectFilter ? `/deals?project=${projectFilter}` : '/deals')
       .then(r => setDeals(r.data))
       .catch(() => setError('Failed to load deals'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [projectFilter])
+
+  useEffect(() => {
+    if (!projectFilter) { setProjectName(''); return }
+    api.get(`/projects/${projectFilter}`).then(r => setProjectName(r.data?.name || '')).catch(() => {})
+  }, [projectFilter])
+
+  const clearProjectFilter = () => {
+    const next = new URLSearchParams(searchParams)
+    next.delete('project')
+    setSearchParams(next)
+  }
 
   const filtered = deals.filter(d => {
     if (filterStage !== 'All' && d.stage !== filterStage) return false
@@ -57,6 +72,13 @@ export default function AllDealsPage() {
             + Add Deal
           </Link>
         </div>
+
+        {projectFilter && (
+          <div className="flex items-center gap-2 bg-primary-50 border border-primary-100 text-primary-700 rounded-lg px-4 py-2.5 mb-4 text-sm">
+            <span>Filtered by project{projectName ? `: ${projectName}` : ''}</span>
+            <button onClick={clearProjectFilter} className="ml-auto text-xs font-medium underline hover:text-primary-800">Clear filter</button>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">

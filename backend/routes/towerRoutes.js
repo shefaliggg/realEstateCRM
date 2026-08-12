@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router({ mergeParams: true })
-const { protect, adminOnly } = require('../middleware/authMiddleware')
+const { protect, requirePermission, blockExternalUsers } = require('../middleware/authMiddleware')
+const { attachTenantScope, requireBuilderScope } = require('../middleware/tenantMiddleware')
 const { projectImageUpload } = require('../middleware/uploadMiddleware')
 const { getTowers, getTowerById, createTower, updateTower, deleteTower } = require('../controllers/towerController')
 
@@ -11,7 +12,9 @@ const towerDocUpload = projectImageUpload.fields([
 ])
 
 // Mounted at /api/projects/:projectId/towers
-router.route('/').get(protect, getTowers).post(protect, adminOnly, towerDocUpload, createTower)
-router.route('/:id').get(protect, getTowerById).put(protect, adminOnly, towerDocUpload, updateTower).delete(protect, adminOnly, deleteTower)
+router.use(protect, attachTenantScope, requireBuilderScope, blockExternalUsers)
+
+router.route('/').get(getTowers).post(requirePermission('manage_inventory'), towerDocUpload, createTower)
+router.route('/:id').get(getTowerById).put(requirePermission('manage_inventory'), towerDocUpload, updateTower).delete(requirePermission('manage_inventory'), deleteTower)
 
 module.exports = router

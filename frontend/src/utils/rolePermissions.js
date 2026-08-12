@@ -1,5 +1,7 @@
+import api from '../api/axios'
+
 export const ROLE_OPTIONS = [
-  'admin',
+  'builder_admin',
   'sales_manager',
   'sales_executive',
   'crm_manager',
@@ -31,58 +33,25 @@ export const MODULE_OPTIONS = [
   'Marketing Analytics',
 ]
 
-const STORAGE_KEY = 'role-module-permissions'
+// Backend permission key for a nav module — must match
+// backend/utils/permissions.js's MODULE_PERMISSION_KEYS.
+export const moduleKey = (module) => `module:${module}`
 
-function createDefaultRolePermissions() {
-  const config = {}
-  for (const role of ROLE_OPTIONS) {
-    config[role] = {}
-    for (const module of MODULE_OPTIONS) {
-      config[role][module] = true
-    }
-  }
-  return config
+// permissions: the flat permission-key array on the authenticated user
+// (AuthContext's user.permissions, sourced from the backend Role for their
+// current membership — see backend/utils/roleService.js).
+export function hasModuleAccess(permissions, module) {
+  return Boolean(permissions?.includes(moduleKey(module)))
 }
 
-function readConfig() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return createDefaultRolePermissions()
-
-    const parsed = JSON.parse(raw)
-    const defaults = createDefaultRolePermissions()
-
-    for (const role of ROLE_OPTIONS) {
-      const source = parsed?.[role]
-      if (!source || typeof source !== 'object') continue
-      for (const module of MODULE_OPTIONS) {
-        if (typeof source[module] === 'boolean') {
-          defaults[role][module] = source[module]
-        }
-      }
-    }
-
-    return defaults
-  } catch {
-    return createDefaultRolePermissions()
-  }
+// GET /api/roles — this builder's 7 roles with their permission arrays.
+export async function fetchRoles() {
+  const { data } = await api.get('/roles')
+  return data
 }
 
-function writeConfig(config) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config))
-}
-
-export function getRoleModulePermissions(role) {
-  const config = readConfig()
-  return config[role] ?? config.sales_executive ?? {}
-}
-
-export function saveRoleModulePermissions(role, modulePermissions) {
-  const config = readConfig()
-  config[role] = {
-    ...(config[role] ?? {}),
-    ...modulePermissions,
-  }
-  writeConfig(config)
-  window.dispatchEvent(new Event('role-permissions-updated'))
+// PUT /api/roles/:key — replace one role's full permission array.
+export async function updateRolePermissions(roleKey, permissions) {
+  const { data } = await api.put(`/roles/${roleKey}`, { permissions })
+  return data
 }

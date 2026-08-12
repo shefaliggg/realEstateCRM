@@ -132,6 +132,9 @@ const normalizeProjectPayload = (body, files = []) => {
   const managedBy = parseArrayField(body.managedBy)
   if (managedBy !== undefined) payload.managedBy = managedBy
 
+  const teamDesignations = parseArrayField(body.teamDesignations)
+  if (teamDesignations !== undefined) payload.teamDesignations = teamDesignations
+
   const uploadedImages = uploadedFileUrls(fileBuckets.images)
   const uploadedVideos = uploadedFileUrls(fileBuckets.videos)
   const explicitImages = parseArrayField(body.images)
@@ -178,12 +181,13 @@ const normalizeProjectPayload = (body, files = []) => {
 
 const getProjects = async (req, res) => {
   try {
-    const projects = await Project.find()
+    const projects = await Project.find({ builderId: req.builderId })
       .populate('managedBy', 'name email phone role')
+      .populate('teamDesignations.user', 'name email phone role')
       .sort({ createdAt: -1 })
     const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
-        const units = await Unit.find({ project: project._id })
+        const units = await Unit.find({ project: project._id, builderId: req.builderId })
         return {
           ...project.toObject(),
           inventoryStats: {
@@ -204,9 +208,11 @@ const getProjects = async (req, res) => {
 
 const getProjectById = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id).populate('managedBy', 'name email phone role')
+    const project = await Project.findOne({ _id: req.params.id, builderId: req.builderId })
+      .populate('managedBy', 'name email phone role')
+      .populate('teamDesignations.user', 'name email phone role')
     if (!project) return res.status(404).json({ message: 'Project not found' })
-    const units = await Unit.find({ project: project._id })
+    const units = await Unit.find({ project: project._id, builderId: req.builderId })
     res.json({
       ...project.toObject(),
       inventoryStats: {
@@ -225,7 +231,7 @@ const getProjectById = async (req, res) => {
 const createProject = async (req, res) => {
   try {
     const payload = normalizeProjectPayload(req.body, req.files)
-    const project = new Project({ ...payload, createdBy: req.user._id })
+    const project = new Project({ ...payload, builderId: req.builderId, createdBy: req.user._id })
     await project.save()
     res.status(201).json(project)
   } catch (err) {
@@ -236,10 +242,12 @@ const createProject = async (req, res) => {
 const updateProject = async (req, res) => {
   try {
     const payload = normalizeProjectPayload(req.body, req.files)
-    const project = await Project.findByIdAndUpdate(req.params.id, payload, {
+    const project = await Project.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, payload, {
       new: true,
       runValidators: true,
-    }).populate('managedBy', 'name email phone role')
+    })
+      .populate('managedBy', 'name email phone role')
+      .populate('teamDesignations.user', 'name email phone role')
     if (!project) return res.status(404).json({ message: 'Project not found' })
     res.json(project)
   } catch (err) {
@@ -249,7 +257,7 @@ const updateProject = async (req, res) => {
 
 const deleteProject = async (req, res) => {
   try {
-    const project = await Project.findByIdAndDelete(req.params.id)
+    const project = await Project.findOneAndDelete({ _id: req.params.id, builderId: req.builderId })
     if (!project) return res.status(404).json({ message: 'Project not found' })
     res.json({ message: 'Project deleted' })
   } catch (err) {

@@ -14,10 +14,19 @@ const towerRoutes = require('./routes/towerRoutes');
 const unitRoutes = require('./routes/unitRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const dealRoutes = require('./routes/dealRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const paymentScheduleRoutes = require('./routes/paymentScheduleRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const aiRoutes = require('./routes/aiRoutes');
+const auditRoutes = require('./routes/auditRoutes');
+const roleRoutes = require('./routes/roleRoutes');
+const builderRoutes = require('./routes/builderRoutes');
+const channelPartnerRoutes = require('./routes/channelPartnerRoutes');
+const partnerPortalRoutes = require('./routes/partnerPortalRoutes');
+const customerPortalRoutes = require('./routes/customerPortalRoutes');
+const platformRoutes = require('./routes/platformRoutes');
 
 const app = express();
 
@@ -31,9 +40,9 @@ const corsOptions = {
 };
 
 if (isProduction) {
-  corsOptions.origin = process.env.FRONTEND_URL || true;
+  corsOptions.origin = [process.env.FRONTEND_URL, process.env.ADMIN_FRONTEND_URL].filter(Boolean);
 } else {
-  corsOptions.origin = 'http://localhost:5173';
+  corsOptions.origin = ['http://localhost:5173', 'http://localhost:5174'];
 }
 
 // Middleware
@@ -61,10 +70,19 @@ app.use('/api/projects/:projectId/units', unitRoutes);
 app.use('/api/units', unitRoutes); // direct unit lookup by id
 app.use('/api/leads', leadRoutes);
 app.use('/api/deals', dealRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/schedules', paymentScheduleRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/ai', aiRoutes);
+app.use('/api/audit-logs', auditRoutes);
+app.use('/api/roles', roleRoutes);
+app.use('/api/builder', builderRoutes);
+app.use('/api/channel-partners', channelPartnerRoutes);
+app.use('/api/partner', partnerPortalRoutes);
+app.use('/api/customer-portal', customerPortalRoutes);
+app.use('/api/platform', platformRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
