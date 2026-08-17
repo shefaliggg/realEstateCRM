@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { formatPrice, formatDate, getInitials } from './projectDetail/shared'
+import { EditPencilButton, HoverPhotoEdit } from './projectDetail/editShared'
+import { EditCoverPhotoModal, EditLogoModal, EditHeaderInfoModal, EditPricingModal, EditSalesStatusModal } from './projectDetail/headerEditModals'
 import OverviewTab from './projectDetail/OverviewTab'
 import ProfileTab from './projectDetail/ProfileTab'
 import TowersTab from './projectDetail/TowersTab'
@@ -45,6 +47,9 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [tab, setTab] = useState('overview')
+  const [headerModal, setHeaderModal] = useState(null)
+
+  const handleProjectChanged = useCallback((p) => setProject((prev) => ({ ...prev, ...p })), [])
 
   const refetchUnits = useCallback(() => {
     api.get(`/projects/${id}/units`).then((res) => setUnits(res.data)).catch(() => {})
@@ -118,30 +123,44 @@ export default function ProjectDetailPage() {
 
       {/* Header */}
       <div className="relative mb-6 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="relative w-full overflow-hidden">
+        <div className="group relative w-full overflow-hidden">
           {heroImage ? (
             <img src={heroImage} alt={project.name} className="absolute inset-0 h-full w-full scale-110 object-cover blur-md" />
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-primary-600 to-primary-500" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-gray-200/85 via-gray-100/70 to-gray-50/50" />
+          <HoverPhotoEdit onClick={() => setHeaderModal('cover')} title="Change cover photo" className="bottom-3 right-3 opacity-0 group-hover:opacity-100" />
 
           <div className="relative flex flex-col gap-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                {project.logo ? (
-                  <img src={project.logo} alt="" className="h-14 w-14 rounded-xl border-2 border-white bg-white object-cover shadow-md shrink-0" />
-                ) : (
-                  <div className="h-14 w-14 rounded-xl border-2 border-white bg-gray-100 shadow-md shrink-0 flex items-center justify-center text-gray-700 font-bold text-lg">
-                    {getInitials(project.name)}
-                  </div>
-                )}
+                <div className="group/logo relative h-14 w-14 shrink-0">
+                  {project.logo ? (
+                    <img src={project.logo} alt="" className="h-14 w-14 rounded-xl border-2 border-white bg-white object-cover shadow-md" />
+                  ) : (
+                    <div className="h-14 w-14 rounded-xl border-2 border-white bg-gray-100 shadow-md flex items-center justify-center text-gray-700 font-bold text-lg">
+                      {getInitials(project.name)}
+                    </div>
+                  )}
+                  <HoverPhotoEdit
+                    onClick={() => setHeaderModal('logo')}
+                    title="Change logo"
+                    className="h-6 w-6 -bottom-1 -right-1 text-xs opacity-0 group-hover/logo:opacity-100"
+                  />
+                </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${project.salesInfo?.bookingOpen ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    <button
+                      type="button"
+                      onClick={() => setHeaderModal('sales')}
+                      title="Edit booking status"
+                      className={`text-[11px] font-medium px-2 py-0.5 rounded-full transition-colors ${project.salesInfo?.bookingOpen ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    >
                       {project.salesInfo?.bookingOpen ? 'Booking Open' : 'Booking Closed'}
-                    </span>
+                    </button>
+                    <EditPencilButton onClick={() => setHeaderModal('info')} label="Edit Info" />
                   </div>
                   <p className="text-sm text-gray-600 mt-0.5">
                     {project.type} · {project.status} · {locationText || 'Location pending'}
@@ -153,12 +172,14 @@ export default function ProjectDetailPage() {
               </div>
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">Price</p>
-                <p className="font-bold text-gray-900">{priceLabel}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-gray-900">{priceLabel}</p>
+                  <EditPencilButton onClick={() => setHeaderModal('pricing')} label="" />
+                </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link to={`/projects/${id}/edit`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">✏️ Edit</Link>
               <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏠 Add Unit</Link>
               <Link to={`/projects/${id}/towers/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏢 Add Tower</Link>
               <Link to={`/leads/add?project=${id}`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">👤 Add Lead</Link>
@@ -170,6 +191,12 @@ export default function ProjectDetailPage() {
           </div>
         </div>
       </div>
+
+      {headerModal === 'cover' && <EditCoverPhotoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
+      {headerModal === 'logo' && <EditLogoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
+      {headerModal === 'info' && <EditHeaderInfoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
+      {headerModal === 'pricing' && <EditPricingModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
+      {headerModal === 'sales' && <EditSalesStatusModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
 
       <div>
         {/* Tabs */}
@@ -194,15 +221,18 @@ export default function ProjectDetailPage() {
           />
         )}
         {tab === 'profile' && (
-          <ProfileTab project={project} profileTypeConfig={profileTypeConfig} locationText={locationText} mapSrc={mapSrc} mapActionLink={mapActionLink} />
+          <ProfileTab
+            id={id} project={project} profileTypeConfig={profileTypeConfig} locationText={locationText} mapSrc={mapSrc} mapActionLink={mapActionLink}
+            onProjectChanged={handleProjectChanged}
+          />
         )}
         {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} onTowersChanged={refetchTowers} />}
         {tab === 'inventory' && <InventoryTab id={id} project={project} units={units} onUnitsChanged={refetchUnits} />}
-        {tab === 'documents' && <DocumentsTab project={project} />}
-        {tab === 'gallery' && <GalleryTab project={project} />}
+        {tab === 'documents' && <DocumentsTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
+        {tab === 'gallery' && <GalleryTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
         {tab === 'activity' && <ActivityTab units={units} bookings={bookings} payments={payments} userById={userById} />}
         {tab === 'team' && (
-          <TeamTab id={id} project={project} users={users} onProjectChanged={(p) => setProject((prev) => ({ ...prev, ...p }))} />
+          <TeamTab id={id} project={project} users={users} onProjectChanged={handleProjectChanged} />
         )}
         {tab === 'settings' && <SettingsTab id={id} project={project} />}
       </div>

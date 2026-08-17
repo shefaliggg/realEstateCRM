@@ -135,14 +135,22 @@ const normalizeProjectPayload = (body, files = []) => {
   const teamDesignations = parseArrayField(body.teamDesignations)
   if (teamDesignations !== undefined) payload.teamDesignations = teamDesignations
 
-  const uploadedImages = uploadedFileUrls(fileBuckets.images)
-  const uploadedVideos = uploadedFileUrls(fileBuckets.videos)
-  const explicitImages = parseArrayField(body.images)
-  const explicitVideos = parseArrayField(body.videos)
-  if (uploadedImages.length > 0) payload.images = uploadedImages
-  else if (explicitImages !== undefined) payload.images = explicitImages
-  if (uploadedVideos.length > 0) payload.videos = uploadedVideos
-  else if (explicitVideos !== undefined) payload.videos = explicitVideos
+  // Merges newly uploaded files with an explicit kept-URL list (JSON array in body), so an edit
+  // request can both remove existing items (by omitting their URL) and add new ones (as files)
+  // without wiping the rest of the collection. Falls back to upload-only replace when no
+  // explicit list is sent, preserving the original create-flow behavior.
+  const mergeFileArrayField = (bucket, explicitValue) => {
+    const uploaded = uploadedFileUrls(bucket)
+    const explicit = parseArrayField(explicitValue)
+    if (explicit !== undefined) return [...explicit, ...uploaded]
+    if (uploaded.length > 0) return uploaded
+    return undefined
+  }
+
+  const mergedImages = mergeFileArrayField(fileBuckets.images, body.images)
+  if (mergedImages !== undefined) payload.images = mergedImages
+  const mergedVideos = mergeFileArrayField(fileBuckets.videos, body.videos)
+  if (mergedVideos !== undefined) payload.videos = mergedVideos
 
   const logoUrl = uploadedFileUrl(fileBuckets.logo)
   if (logoUrl) payload.logo = logoUrl
@@ -151,10 +159,10 @@ const normalizeProjectPayload = (body, files = []) => {
   const masterPlanUrl = uploadedFileUrl(fileBuckets.masterPlanImage)
   if (masterPlanUrl) payload.masterPlanImage = masterPlanUrl
 
-  const floorPlanImages = uploadedFileUrls(fileBuckets.floorPlanImages)
-  if (floorPlanImages.length > 0) payload.floorPlanImages = floorPlanImages
-  const constructionProgressPhotos = uploadedFileUrls(fileBuckets.constructionProgressPhotos)
-  if (constructionProgressPhotos.length > 0) payload.constructionProgressPhotos = constructionProgressPhotos
+  const mergedFloorPlanImages = mergeFileArrayField(fileBuckets.floorPlanImages, body.floorPlanImages)
+  if (mergedFloorPlanImages !== undefined) payload.floorPlanImages = mergedFloorPlanImages
+  const mergedConstructionProgressPhotos = mergeFileArrayField(fileBuckets.constructionProgressPhotos, body.constructionProgressPhotos)
+  if (mergedConstructionProgressPhotos !== undefined) payload.constructionProgressPhotos = mergedConstructionProgressPhotos
 
   const reraCertificateUrl = uploadedFileUrl(fileBuckets.reraCertificate)
   const brochureUrl = uploadedFileUrl(fileBuckets.brochure)
@@ -162,9 +170,12 @@ const normalizeProjectPayload = (body, files = []) => {
   const paymentPlanUrl = uploadedFileUrl(fileBuckets.paymentPlan)
   const occupancyCertificateUrl = uploadedFileUrl(fileBuckets.occupancyCertificate)
   const completionCertificateUrl = uploadedFileUrl(fileBuckets.completionCertificate)
-  const legalDocuments = uploadedFileUrls(fileBuckets.legalDocuments)
-  const approvalDocuments = uploadedFileUrls(fileBuckets.approvalDocuments)
-  if (reraCertificateUrl || brochureUrl || priceSheetUrl || paymentPlanUrl || occupancyCertificateUrl || completionCertificateUrl || legalDocuments.length > 0 || approvalDocuments.length > 0) {
+  const mergedLegalDocuments = mergeFileArrayField(fileBuckets.legalDocuments, body.legalDocuments)
+  const mergedApprovalDocuments = mergeFileArrayField(fileBuckets.approvalDocuments, body.approvalDocuments)
+  if (
+    reraCertificateUrl || brochureUrl || priceSheetUrl || paymentPlanUrl || occupancyCertificateUrl || completionCertificateUrl ||
+    mergedLegalDocuments !== undefined || mergedApprovalDocuments !== undefined
+  ) {
     payload.documents = {}
     if (reraCertificateUrl) payload.documents.reraCertificate = reraCertificateUrl
     if (brochureUrl) payload.documents.brochure = brochureUrl
@@ -172,10 +183,28 @@ const normalizeProjectPayload = (body, files = []) => {
     if (paymentPlanUrl) payload.documents.paymentPlan = paymentPlanUrl
     if (occupancyCertificateUrl) payload.documents.occupancyCertificate = occupancyCertificateUrl
     if (completionCertificateUrl) payload.documents.completionCertificate = completionCertificateUrl
-    if (legalDocuments.length > 0) payload.documents.legalDocuments = legalDocuments
-    if (approvalDocuments.length > 0) payload.documents.approvalDocuments = approvalDocuments
+    if (mergedLegalDocuments !== undefined) payload.documents.legalDocuments = mergedLegalDocuments
+    if (mergedApprovalDocuments !== undefined) payload.documents.approvalDocuments = mergedApprovalDocuments
   }
 
+  return payload
+}
+
+// Nested object paths (location, pricing, documents, etc.) are stored as plain embedded objects,
+// so a findOneAndUpdate $set on the group key replaces the whole object and silently drops any
+// sibling fields the request didn't include. Flattening to dot-notation before an update makes
+// each sub-field an independent $set target instead. Only safe for updates — the `new Project(...)`
+// constructor used on create does not expand dot-notation keys into nested paths.
+const NESTED_GROUP_KEYS = ['location', 'pricing', 'specifications', 'salesInfo', 'contact', 'seo', 'documents']
+
+const flattenNestedGroupsForUpdate = (payload) => {
+  NESTED_GROUP_KEYS.forEach((key) => {
+    const value = payload[key]
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      Object.entries(value).forEach(([subKey, subValue]) => { payload[`${key}.${subKey}`] = subValue })
+      delete payload[key]
+    }
+  })
   return payload
 }
 
@@ -241,7 +270,7 @@ const createProject = async (req, res) => {
 
 const updateProject = async (req, res) => {
   try {
-    const payload = normalizeProjectPayload(req.body, req.files)
+    const payload = flattenNestedGroupsForUpdate(normalizeProjectPayload(req.body, req.files))
     const project = await Project.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, payload, {
       new: true,
       runValidators: true,

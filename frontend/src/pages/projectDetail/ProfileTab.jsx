@@ -1,6 +1,24 @@
+import { useState } from 'react'
 import { amenityIcon, formatDate, formatPrice, getInitials } from './shared'
+import { EditPencilButton } from './editShared'
+import { EditHeaderInfoModal, EditPricingModal, EditSalesStatusModal } from './headerEditModals'
+import {
+  EditBasicInfoModal, EditLocationModal, EditAmenitiesModal, EditSpecificationsModal, EditNearbyPlacesModal, EditContactModal,
+} from './profileEditModals'
 
-export default function ProfileTab({ project, profileTypeConfig, locationText, mapSrc, mapActionLink }) {
+function CardHeader({ title, onEdit }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h3 className="font-semibold text-gray-800">{title}</h3>
+      {onEdit && <EditPencilButton onClick={onEdit} />}
+    </div>
+  )
+}
+
+export default function ProfileTab({ id, project, profileTypeConfig, locationText, mapSrc, mapActionLink, onProjectChanged }) {
+  const [modal, setModal] = useState(null)
+  const closeModal = () => setModal(null)
+
   const assignedUsers = Array.isArray(project.managedBy) ? project.managedBy.filter((u) => u && typeof u === 'object') : []
   const designationByUserId = new Map(
     (project.teamDesignations || [])
@@ -50,19 +68,21 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">📋 Basic Information</h3>
+        <CardHeader title="📋 Basic Information" onEdit={() => setModal('basic')} />
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between"><dt className="text-gray-500">Project Name</dt><dd className="font-medium text-right">{project.name}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Developer</dt><dd className="font-medium text-right">{project.developerName || '—'}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">Project Type</dt><dd className="font-medium">{project.type}</dd></div>
         </dl>
-        {project.description && (
+        {project.description ? (
           <p className="text-sm text-gray-600 whitespace-pre-line mt-3 pt-3 border-t border-gray-100">{project.description}</p>
+        ) : (
+          <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">No description added yet.</p>
         )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">📍 Location</h3>
+        <CardHeader title="📍 Location" onEdit={() => setModal('location')} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between gap-4"><dt className="text-gray-500">Address</dt><dd className="font-medium text-right">{locationText || '—'}</dd></div>
@@ -87,7 +107,7 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">🏗️ Project Details</h3>
+        <CardHeader title="🏗️ Project Details" onEdit={() => setModal('details')} />
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between"><dt className="text-gray-500">Status</dt><dd className="font-medium">{project.status}</dd></div>
           <div className="flex justify-between"><dt className="text-gray-500">RERA No.</dt><dd className="font-medium">{project.reraNo || '—'}</dd></div>
@@ -101,7 +121,7 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-        <h3 className="font-semibold text-gray-800 mb-3">💰 Pricing</h3>
+        <CardHeader title="💰 Pricing" onEdit={() => setModal('pricing')} />
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between"><dt className="text-gray-500">Price Range</dt><dd className="font-medium">{priceRangeLabel || 'Price on request'}</dd></div>
           {chargeEntries.map(([label, value]) => (
@@ -111,9 +131,9 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
         </dl>
       </div>
 
-      {project.amenities?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-          <h3 className="font-semibold text-gray-800 mb-3">{profileTypeConfig.amenitiesTitle}</h3>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <CardHeader title={profileTypeConfig.amenitiesTitle} onEdit={() => setModal('amenities')} />
+        {project.amenities?.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {project.amenities.map((a) => (
               <span key={a} className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full bg-blue-50 text-blue-700">
@@ -121,24 +141,28 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
               </span>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-xs text-gray-400">No amenities added yet.</p>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {specEntries.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">🧱 Specifications</h3>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <CardHeader title="🧱 Specifications" onEdit={() => setModal('specs')} />
+          {specEntries.length > 0 ? (
             <dl className="space-y-2 text-sm">
               {specEntries.map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-4"><dt className="text-gray-500">{label}</dt><dd className="font-medium text-right">{value}</dd></div>
               ))}
             </dl>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-gray-400">No specifications added yet.</p>
+          )}
+        </div>
 
-        {nearbyLocations.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-            <h3 className="font-semibold text-gray-800 mb-3">📌 Nearby Places</h3>
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <CardHeader title="📌 Nearby Places" onEdit={() => setModal('nearby')} />
+          {nearbyLocations.length > 0 ? (
             <div className="space-y-2">
               {nearbyLocations.map((n, i) => (
                 <div key={i} className="flex justify-between gap-4 text-sm">
@@ -147,53 +171,57 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
                 </div>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-
-      {(hasSalesInfo || contactEntries.length > 0) && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {hasSalesInfo && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <h3 className="font-semibold text-gray-800 mb-3">💼 Sales Information</h3>
-              <dl className="space-y-2 text-sm">
-                <div className="flex justify-between"><dt className="text-gray-500">Bank Loan Available</dt><dd className="font-medium">{salesInfo.bankLoanAvailable ? 'Yes' : 'No'}</dd></div>
-                {salesInfo.approvedBanks?.length > 0 && (
-                  <div className="flex justify-between gap-4"><dt className="text-gray-500">Approved Banks</dt><dd className="font-medium text-right">{salesInfo.approvedBanks.join(', ')}</dd></div>
-                )}
-                {salesInfo.salesOfficeAddress && (
-                  <div className="flex justify-between gap-4"><dt className="text-gray-500">Sales Office</dt><dd className="font-medium text-right">{salesInfo.salesOfficeAddress}</dd></div>
-                )}
-                {salesInfo.siteOfficeContact && (
-                  <div className="flex justify-between"><dt className="text-gray-500">Site Office Contact</dt><dd className="font-medium">{salesInfo.siteOfficeContact}</dd></div>
-                )}
-                {salesInfo.crmNotes && (
-                  <div className="pt-1">
-                    <dt className="text-gray-500 mb-1">CRM Notes</dt>
-                    <dd className="font-medium text-gray-700 whitespace-pre-line">{salesInfo.crmNotes}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          )}
-
-          {contactEntries.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <h3 className="font-semibold text-gray-800 mb-3">📞 Contact</h3>
-              <dl className="space-y-2 text-sm">
-                {contactEntries.map(([label, value, link]) => (
-                  <div key={label} className="flex justify-between gap-4">
-                    <dt className="text-gray-500">{label}</dt>
-                    <dd className="font-medium text-right">
-                      {link ? <a href={link} target="_blank" rel="noreferrer" className="text-primary-600 hover:text-primary-700">{value}</a> : value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
+          ) : (
+            <p className="text-xs text-gray-400">No nearby places added yet.</p>
           )}
         </div>
-      )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <CardHeader title="💼 Sales Information" onEdit={() => setModal('sales')} />
+          {hasSalesInfo ? (
+            <dl className="space-y-2 text-sm">
+              <div className="flex justify-between"><dt className="text-gray-500">Bank Loan Available</dt><dd className="font-medium">{salesInfo.bankLoanAvailable ? 'Yes' : 'No'}</dd></div>
+              {salesInfo.approvedBanks?.length > 0 && (
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Approved Banks</dt><dd className="font-medium text-right">{salesInfo.approvedBanks.join(', ')}</dd></div>
+              )}
+              {salesInfo.salesOfficeAddress && (
+                <div className="flex justify-between gap-4"><dt className="text-gray-500">Sales Office</dt><dd className="font-medium text-right">{salesInfo.salesOfficeAddress}</dd></div>
+              )}
+              {salesInfo.siteOfficeContact && (
+                <div className="flex justify-between"><dt className="text-gray-500">Site Office Contact</dt><dd className="font-medium">{salesInfo.siteOfficeContact}</dd></div>
+              )}
+              {salesInfo.crmNotes && (
+                <div className="pt-1">
+                  <dt className="text-gray-500 mb-1">CRM Notes</dt>
+                  <dd className="font-medium text-gray-700 whitespace-pre-line">{salesInfo.crmNotes}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <p className="text-xs text-gray-400">No sales information added yet.</p>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <CardHeader title="📞 Contact" onEdit={() => setModal('contact')} />
+          {contactEntries.length > 0 ? (
+            <dl className="space-y-2 text-sm">
+              {contactEntries.map(([label, value, link]) => (
+                <div key={label} className="flex justify-between gap-4">
+                  <dt className="text-gray-500">{label}</dt>
+                  <dd className="font-medium text-right">
+                    {link ? <a href={link} target="_blank" rel="noreferrer" className="text-primary-600 hover:text-primary-700">{value}</a> : value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="text-xs text-gray-400">No contact details added yet.</p>
+          )}
+        </div>
+      </div>
 
       {assignedUsers.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -214,6 +242,16 @@ export default function ProfileTab({ project, profileTypeConfig, locationText, m
           <p className="text-[11px] text-gray-400 mt-2">Manage team & designations from the Team tab.</p>
         </div>
       )}
+
+      {modal === 'basic' && <EditBasicInfoModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'location' && <EditLocationModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'details' && <EditHeaderInfoModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'pricing' && <EditPricingModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'amenities' && <EditAmenitiesModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'specs' && <EditSpecificationsModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'nearby' && <EditNearbyPlacesModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'sales' && <EditSalesStatusModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
+      {modal === 'contact' && <EditContactModal id={id} project={project} onClose={closeModal} onSaved={onProjectChanged} />}
     </div>
   )
 }
