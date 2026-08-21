@@ -6,8 +6,8 @@ const STEPS = [
   'Basic Info',
   'Location',
   'Project Details',
-  'Configuration & Pricing',
-  'Amenities & Specifications',
+  'Unit Configuration',
+  'Nearby Locations',
   'Media & Documents',
   'Sales & Contact',
   'Review & Publish',
@@ -16,37 +16,6 @@ const STEPS = [
 const STATUS_OPTIONS = ['Pre-Launch', 'New Launch', 'Under Construction', 'Ready to Move', 'Completed', 'Sold Out']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
 const BLOCK_PRESETS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-
-const AMENITY_LIST = [
-  'Clubhouse', 'Swimming Pool', 'Gym', 'Indoor Games', 'Outdoor Sports', 'Jogging Track',
-  "Children's Play Area", 'Multipurpose Hall', 'Power Backup', 'Lift', 'CCTV', 'Security',
-  'Visitor Parking', 'EV Charging', 'Landscaped Garden', 'Temple', 'Super Market', 'Pharmacy',
-]
-
-function amenityIcon(name) {
-  const n = name.toLowerCase()
-  if (n.includes('pool')) return '🏊'
-  if (n.includes('gym')) return '🏋️'
-  if (n.includes('club')) return '🏛️'
-  if (n.includes('indoor game')) return '🎮'
-  if (n.includes('outdoor sport')) return '🏸'
-  if (n.includes('jogging') || n.includes('track')) return '🏃'
-  if (n.includes('play')) return '🧒'
-  if (n.includes('multipurpose') || n.includes('hall')) return '🏢'
-  if (n.includes('power backup')) return '🔋'
-  if (n.includes('lift')) return '🛗'
-  if (n.includes('cctv') || n.includes('security')) return '🛡️'
-  if (n.includes('parking')) return '🅿️'
-  if (n.includes('ev charg')) return '🔌'
-  if (n.includes('garden') || n.includes('landscape')) return '🌳'
-  if (n.includes('temple')) return '🛕'
-  if (n.includes('market')) return '🛒'
-  if (n.includes('pharmacy')) return '💊'
-  if (n.includes('basketball')) return '🏀'
-  if (n.includes('tennis')) return '🎾'
-  if (n.includes('yoga')) return '🧘'
-  return '✨'
-}
 
 const NEARBY_TYPES = ['School', 'Hospital', 'Metro', 'Railway Station', 'Airport', 'Mall', 'IT Park', 'Bus Stand']
 
@@ -78,16 +47,6 @@ const STATE_CITIES = {
   'Chandigarh': ['Chandigarh'],
 }
 
-const STRUCTURE_OPTIONS = ['RCC Framed Structure', 'Earthquake Resistant RCC Structure', 'Steel Structure', 'Load Bearing Structure']
-const FLOORING_OPTIONS = ['Vitrified Tiles', 'Marble Flooring', 'Wooden Flooring', 'Granite Flooring', 'Ceramic Tiles']
-const KITCHEN_OPTIONS = ['Granite Platform with SS Sink', 'Modular Kitchen', 'Granite Platform with Water Purifier Provision']
-const BATHROOM_OPTIONS = ['Anti-skid Ceramic Tiles', 'Designer Tiles with Premium CP Fittings', 'Vitrified Tiles Dado']
-const DOORS_OPTIONS = ['Engineered Wood Frame with Flush Doors', 'Teak Wood Frame', 'Laminated Flush Doors']
-const WINDOWS_OPTIONS = ['UPVC Windows', 'Aluminium Sliding Windows', 'Powder Coated Aluminium Windows']
-const ELECTRICAL_OPTIONS = ['Concealed Copper Wiring', 'Fire Retardant Copper Wiring with Modular Switches']
-const PLUMBING_OPTIONS = ['CPVC / PVC Piping', 'ISI Marked CPVC Piping']
-const PAINT_OPTIONS = ['Emulsion Paint', 'Premium Acrylic Emulsion', 'Textured Exterior Paint']
-
 const extractLatLngFromMapLink = (link) => {
   if (!link) return null
   const patterns = [/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/, /@(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/]
@@ -104,8 +63,6 @@ const EMPTY_FORM = {
   status: 'Pre-Launch', reraNo: '', reraRegistrationDate: '', launchDate: '', possessionDate: '', constructionStartDate: '',
   totalLandArea: '', numberOfTowers: '', numberOfFloors: '',
   blocks: [], bhkTypes: [], unitConfigurations: [],
-  priceStart: '', priceEnd: '', basePricePerSqft: '', plcCharges: '', floorRiseCharges: '', parkingCharges: '', clubMembershipFee: '', gstApplicable: false, registrationCharges: '', otherCharges: '',
-  amenities: [], structure: '', flooring: '', kitchen: '', bathroom: '', doors: '', windows: '', electrical: '', plumbing: '', paint: '',
   nearbyLocations: [],
   virtualTourLink: '',
   managedBy: [], bookingOpen: false, bankLoanAvailable: false, approvedBanks: [], salesOfficeAddress: '', siteOfficeContact: '', crmNotes: '',
@@ -194,7 +151,6 @@ export default function AddBuildingPage() {
   const [loading, setLoading] = useState(false)
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
-  const [specCustom, setSpecCustom] = useState({})
   const [cityCustom, setCityCustom] = useState(false)
   const filesRef = useRef(files)
 
@@ -276,36 +232,6 @@ export default function AddBuildingPage() {
           </div>
         )}
       </div>
-    )
-  }
-
-  function SpecSelectField({ label, field, options, placeholder }) {
-    const value = form[field]
-    const isCustom = specCustom[field] || (!!value && !options.includes(value))
-    return (
-      <Field label={label}>
-        <select
-          value={isCustom ? 'Other' : value}
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === 'Other') {
-              setSpecCustom((s) => ({ ...s, [field]: true }))
-              set(field, '')
-            } else {
-              setSpecCustom((s) => ({ ...s, [field]: false }))
-              set(field, v)
-            }
-          }}
-          className={selectCls}
-        >
-          <option value="">Select</option>
-          {options.map((o) => <option key={o}>{o}</option>)}
-          <option value="Other">Other (specify)</option>
-        </select>
-        {isCustom && (
-          <input value={value} onChange={onChange(field)} className={`${inputCls} mt-2`} placeholder={placeholder || 'Specify...'} />
-        )}
-      </Field>
     )
   }
 
@@ -392,27 +318,6 @@ export default function AddBuildingPage() {
       fd.append('bhkTypes', JSON.stringify(form.bhkTypes))
       fd.append('unitConfigurations', JSON.stringify(form.unitConfigurations.filter((r) => r.bhk)))
 
-      append('priceStart', form.priceStart)
-      append('priceEnd', form.priceEnd)
-      append('basePricePerSqft', form.basePricePerSqft)
-      append('plcCharges', form.plcCharges)
-      append('floorRiseCharges', form.floorRiseCharges)
-      append('parkingCharges', form.parkingCharges)
-      append('clubMembershipFee', form.clubMembershipFee)
-      fd.append('gstApplicable', String(form.gstApplicable))
-      append('registrationCharges', form.registrationCharges)
-      append('otherCharges', form.otherCharges)
-
-      fd.append('amenities', JSON.stringify(form.amenities))
-      append('structure', form.structure)
-      append('flooring', form.flooring)
-      append('kitchen', form.kitchen)
-      append('bathroom', form.bathroom)
-      append('doors', form.doors)
-      append('windows', form.windows)
-      append('electrical', form.electrical)
-      append('plumbing', form.plumbing)
-      append('paint', form.paint)
       fd.append('nearbyLocations', JSON.stringify(form.nearbyLocations.filter((r) => r.name)))
 
       append('virtualTourLink', form.virtualTourLink)
@@ -613,13 +518,13 @@ export default function AddBuildingPage() {
                 <input type="number" value={form.numberOfFloors} onChange={onChange('numberOfFloors')} className={inputCls} />
               </Field>
             </div>
-            <p className="text-xs text-gray-400">Total units will be calculated automatically from the flats you add to each block after this building is created.</p>
+            <p className="text-xs text-gray-400">Total units will be calculated automatically from the flats you add to each tower after this building is created.</p>
             <TagInput
-              label="Blocks / Towers"
+              label="Towers"
               values={form.blocks}
               onAdd={addBlock}
               onRemove={removeBlock}
-              placeholder="Add custom block name (e.g. Tower-1)"
+              placeholder="Add custom tower name (e.g. Tower-1)"
               presets={BLOCK_PRESETS}
             />
           </SectionCard>
@@ -688,98 +593,26 @@ export default function AddBuildingPage() {
                 </div>
               </div>
             </SectionCard>
-
-            <SectionCard title="Pricing" icon="💰">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <Field label="Price Starts From (₹)">
-                  <input type="number" value={form.priceStart} onChange={onChange('priceStart')} className={inputCls} />
-                </Field>
-                <Field label="Price Ends At (₹)">
-                  <input type="number" value={form.priceEnd} onChange={onChange('priceEnd')} className={inputCls} />
-                </Field>
-                <Field label="Base Price per Sq.ft (₹)">
-                  <input type="number" value={form.basePricePerSqft} onChange={onChange('basePricePerSqft')} className={inputCls} />
-                </Field>
-                <Field label="PLC Charges (₹)">
-                  <input type="number" value={form.plcCharges} onChange={onChange('plcCharges')} className={inputCls} />
-                </Field>
-                <Field label="Floor Rise Charges (₹)">
-                  <input type="number" value={form.floorRiseCharges} onChange={onChange('floorRiseCharges')} className={inputCls} />
-                </Field>
-                <Field label="Parking Charges (₹)">
-                  <input type="number" value={form.parkingCharges} onChange={onChange('parkingCharges')} className={inputCls} />
-                </Field>
-                <Field label="Club Membership Fee (₹)">
-                  <input type="number" value={form.clubMembershipFee} onChange={onChange('clubMembershipFee')} className={inputCls} />
-                </Field>
-                <Field label="Registration Charges (₹)">
-                  <input type="number" value={form.registrationCharges} onChange={onChange('registrationCharges')} className={inputCls} />
-                </Field>
-                <Field label="Other Charges (₹)">
-                  <input type="number" value={form.otherCharges} onChange={onChange('otherCharges')} className={inputCls} />
-                </Field>
-                <Field label="GST Applicable">
-                  <div className="flex items-center h-[42px]">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={form.gstApplicable} onChange={(e) => set('gstApplicable', e.target.checked)} className="w-4 h-4 accent-primary-600" />
-                      <span className="text-sm text-gray-600">GST applicable on this project</span>
-                    </label>
-                  </div>
-                </Field>
-              </div>
-            </SectionCard>
           </>
         )}
 
         {step === 5 && (
-          <>
-            <SectionCard title="Amenities" icon="🏊">
-              <div className="flex flex-wrap gap-2">
-                {AMENITY_LIST.map((a) => {
-                  const selected = form.amenities.includes(a)
-                  return (
-                    <button key={a} type="button" onClick={() => toggleFromArray('amenities', a)}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition font-medium ${
-                        selected ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-700'
-                      }`}>
-                      <span className="mr-1">{amenityIcon(a)}</span>{a}
-                    </button>
-                  )
-                })}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Specifications" icon="🧱">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <SpecSelectField label="Structure" field="structure" options={STRUCTURE_OPTIONS} />
-                <SpecSelectField label="Flooring" field="flooring" options={FLOORING_OPTIONS} />
-                <SpecSelectField label="Kitchen" field="kitchen" options={KITCHEN_OPTIONS} />
-                <SpecSelectField label="Bathroom" field="bathroom" options={BATHROOM_OPTIONS} />
-                <SpecSelectField label="Doors" field="doors" options={DOORS_OPTIONS} />
-                <SpecSelectField label="Windows" field="windows" options={WINDOWS_OPTIONS} />
-                <SpecSelectField label="Electrical" field="electrical" options={ELECTRICAL_OPTIONS} />
-                <SpecSelectField label="Plumbing" field="plumbing" options={PLUMBING_OPTIONS} />
-                <SpecSelectField label="Paint" field="paint" options={PAINT_OPTIONS} />
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Nearby Locations" icon="📌">
-              <div className="space-y-3">
-                {form.nearbyLocations.map((row, idx) => (
-                  <div key={idx} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,1.5fr,1fr,auto] items-center">
-                    <select value={row.type} onChange={(e) => updateNearby(idx, 'type', e.target.value)} className={selectCls}>
-                      {NEARBY_TYPES.map((t) => <option key={t}>{t}</option>)}
-                    </select>
-                    <input value={row.name} onChange={(e) => updateNearby(idx, 'name', e.target.value)} className={inputCls} placeholder="Name (e.g. DPS School)" />
-                    <input value={row.distance} onChange={(e) => updateNearby(idx, 'distance', e.target.value)} className={inputCls} placeholder="2.5 km" />
-                    <button type="button" onClick={() => removeNearby(idx)} className="text-xs font-medium text-red-500 hover:text-red-600">Remove</button>
-                  </div>
-                ))}
-                {form.nearbyLocations.length === 0 && <p className="text-xs text-gray-400">No nearby locations added yet</p>}
-              </div>
-              <button type="button" onClick={addNearby} className="text-sm font-medium text-primary-600 hover:text-primary-700">+ Add Nearby Location</button>
-            </SectionCard>
-          </>
+          <SectionCard title="Nearby Locations" icon="📌">
+            <div className="space-y-3">
+              {form.nearbyLocations.map((row, idx) => (
+                <div key={idx} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr,1.5fr,1fr,auto] items-center">
+                  <select value={row.type} onChange={(e) => updateNearby(idx, 'type', e.target.value)} className={selectCls}>
+                    {NEARBY_TYPES.map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                  <input value={row.name} onChange={(e) => updateNearby(idx, 'name', e.target.value)} className={inputCls} placeholder="Name (e.g. DPS School)" />
+                  <input value={row.distance} onChange={(e) => updateNearby(idx, 'distance', e.target.value)} className={inputCls} placeholder="2.5 km" />
+                  <button type="button" onClick={() => removeNearby(idx)} className="text-xs font-medium text-red-500 hover:text-red-600">Remove</button>
+                </div>
+              ))}
+              {form.nearbyLocations.length === 0 && <p className="text-xs text-gray-400">No nearby locations added yet</p>}
+            </div>
+            <button type="button" onClick={addNearby} className="text-sm font-medium text-primary-600 hover:text-primary-700">+ Add Nearby Location</button>
+          </SectionCard>
         )}
 
         {step === 6 && (
@@ -920,7 +753,7 @@ export default function AddBuildingPage() {
                 <p className="font-medium text-gray-900">{form.status}</p>
               </div>
               <div className="rounded-lg border border-gray-100 p-3">
-                <p className="text-xs text-gray-400 mb-1">Blocks / Towers</p>
+                <p className="text-xs text-gray-400 mb-1">Towers</p>
                 <p className="font-medium text-gray-900">{form.blocks.length || '—'}</p>
               </div>
               <div className="rounded-lg border border-gray-100 p-3">
@@ -928,15 +761,12 @@ export default function AddBuildingPage() {
                 <p className="font-medium text-gray-900">{form.unitConfigurations.filter((r) => r.bhk).length || 0} added</p>
               </div>
               <div className="rounded-lg border border-gray-100 p-3">
-                <p className="text-xs text-gray-400 mb-1">Amenities</p>
-                <p className="font-medium text-gray-900">{form.amenities.length} selected</p>
-              </div>
-              <div className="rounded-lg border border-gray-100 p-3">
                 <p className="text-xs text-gray-400 mb-1">Assigned Team</p>
                 <p className="font-medium text-gray-900">{form.managedBy.length} user(s)</p>
               </div>
             </div>
             <p className="text-xs text-gray-400">Inventory summary (available / booked / sold / blocked units) is calculated automatically once units are added to this building.</p>
+            <p className="text-xs text-gray-400">Common amenities are set from this project's Profile tab. Tower-specific amenities and specifications are set per tower — add them from a tower's page after creating this building.</p>
           </SectionCard>
         )}
 

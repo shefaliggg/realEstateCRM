@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import TowerCard from './TowerCard'
 
-export default function TowersTab({ id, project, units, towers, onTowersChanged }) {
+export default function TowersTab({ id, project, units, towers }) {
   const towerByName = new Map((towers || []).map((t) => [t.name, t]))
   const blockNames = [...new Set([...(project.blocks || []), ...units.map((u) => u.block)])]
   const towerCards = blockNames.map((name) => {
@@ -38,7 +38,7 @@ export default function TowersTab({ id, project, units, towers, onTowersChanged 
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {towerCards.map((tower) => (
-            <TowerCard key={tower.name} id={id} tower={tower} onDeleted={onTowersChanged} />
+            <TowerCard key={tower.name} id={id} tower={tower} />
           ))}
         </div>
       )}

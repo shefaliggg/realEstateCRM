@@ -14,6 +14,47 @@ export function Field({ label, children, className, hint }) {
   )
 }
 
+export function SpecSelectField({ label, value, onChange, options }) {
+  const [customOn, setCustomOn] = useState(!!value && !options.includes(value))
+  return (
+    <Field label={label}>
+      <select
+        value={customOn ? 'Other' : value}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v === 'Other') { setCustomOn(true); onChange('') }
+          else { setCustomOn(false); onChange(v) }
+        }}
+        className={selectCls}
+      >
+        <option value="">Select</option>
+        {options.map((o) => <option key={o}>{o}</option>)}
+        <option value="Other">Other (specify)</option>
+      </select>
+      {customOn && <input value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} mt-2`} placeholder="Specify..." />}
+    </Field>
+  )
+}
+
+// Bare modal shell for content that manages its own submission/state (unlike EditModal, which
+// always renders a single Save/Cancel form footer).
+export function Modal({ title, icon, onClose, children, wide }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className={`bg-white rounded-2xl shadow-xl w-full ${wide ? 'max-w-2xl' : 'max-w-lg'} max-h-[90vh] flex flex-col`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="font-semibold text-gray-900">{icon} {title}</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">×</button>
+        </div>
+        <div className="px-5 py-4 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export function EditModal({ title, icon, onClose, onSubmit, saving, error, children, submitLabel = 'Save Changes', wide }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -69,7 +110,7 @@ export function HoverPhotoEdit({ onClick, title = 'Change photo', className = ''
   )
 }
 
-export function useProjectSave(id, onSaved) {
+export function useEntitySave(url, onSaved) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -77,7 +118,7 @@ export function useProjectSave(id, onSaved) {
     setSaving(true)
     setError('')
     try {
-      const res = await api.put(`/projects/${id}`, payload, multipart ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined)
+      const res = await api.put(url, payload, multipart ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined)
       onSaved(res.data)
       return true
     } catch (err) {
@@ -89,6 +130,10 @@ export function useProjectSave(id, onSaved) {
   }
 
   return { save, saving, error }
+}
+
+export function useProjectSave(id, onSaved) {
+  return useEntitySave(`/projects/${id}`, onSaved)
 }
 
 export function buildFormData(fields, files) {

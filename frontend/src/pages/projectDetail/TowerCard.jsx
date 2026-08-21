@@ -1,6 +1,4 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import api from '../../api/axios'
+import { Link } from 'react-router-dom'
 import { formatDate } from './shared'
 
 const STATUS_COLORS = {
@@ -9,33 +7,9 @@ const STATUS_COLORS = {
   Ready: 'bg-green-100 text-green-700',
 }
 
-export default function TowerCard({ id, tower, onDeleted }) {
-  const navigate = useNavigate()
+export default function TowerCard({ id, tower }) {
   const stats = tower.unitStats || {}
   const sold = stats.registered || 0
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const isRealTower = Boolean(tower._id)
-
-  const handleEdit = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    navigate(`/projects/${id}/towers/${tower._id}/edit`)
-  }
-
-  const handleDelete = async (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!confirmDelete) { setConfirmDelete(true); return }
-    setDeleting(true)
-    try {
-      await api.delete(`/projects/${id}/towers/${tower._id}`)
-      onDeleted?.()
-    } catch {
-      setDeleting(false)
-      setConfirmDelete(false)
-    }
-  }
 
   return (
     <Link
@@ -44,29 +18,11 @@ export default function TowerCard({ id, tower, onDeleted }) {
     >
       <div className="flex items-center justify-between gap-2 mb-3">
         <h4 className="font-semibold text-gray-900">Tower {tower.name}</h4>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {tower.status && (
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[tower.status] || 'bg-gray-100 text-gray-600'}`}>
-              {tower.status}
-            </span>
-          )}
-          {isRealTower && (
-            <>
-              <button type="button" onClick={handleEdit} title="Edit Tower" className="h-6 w-6 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-primary-600 transition-colors">
-                ✏️
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                title={confirmDelete ? 'Click again to confirm' : 'Delete Tower'}
-                className={`h-6 w-6 flex items-center justify-center rounded-md transition-colors ${confirmDelete ? 'bg-red-100 text-red-600' : 'text-gray-400 hover:bg-gray-100 hover:text-red-600'}`}
-              >
-                🗑️
-              </button>
-            </>
-          )}
-        </div>
+        {tower.status && (
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_COLORS[tower.status] || 'bg-gray-100 text-gray-600'}`}>
+            {tower.status}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 text-center mb-3">

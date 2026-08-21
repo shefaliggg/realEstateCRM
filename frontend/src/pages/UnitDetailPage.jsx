@@ -44,14 +44,14 @@ export default function UnitDetailPage() {
             </>
           )}
           <span>/</span>
-          <span className="text-gray-900 font-medium">Block {unit.block} – {unit.unitNo}</span>
+          <span className="text-gray-900 font-medium">Tower {unit.block} – {unit.unitNo}</span>
         </div>
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              Block {unit.block} – Unit {unit.unitNo}
+              Tower {unit.block} – Unit {unit.unitNo}
             </h1>
           </div>
           <span className={`text-sm font-medium px-3 py-1.5 rounded-full ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -65,7 +65,7 @@ export default function UnitDetailPage() {
           <dl className="grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
             <div><dt className="text-gray-500">BHK Type</dt><dd className="font-medium mt-0.5">{unit.bhkType}</dd></div>
             <div><dt className="text-gray-500">Floor</dt><dd className="font-medium mt-0.5">{unit.floor}</dd></div>
-            <div><dt className="text-gray-500">Block</dt><dd className="font-medium mt-0.5">{unit.block}</dd></div>
+            <div><dt className="text-gray-500">Tower</dt><dd className="font-medium mt-0.5">{unit.block}</dd></div>
             <div><dt className="text-gray-500">Unit No.</dt><dd className="font-medium mt-0.5">{unit.unitNo}</dd></div>
             <div><dt className="text-gray-500">Carpet Area</dt><dd className="font-medium mt-0.5">{unit.carpetArea ? `${unit.carpetArea} sqft` : '—'}</dd></div>
             <div><dt className="text-gray-500">Base Price</dt><dd className="font-medium mt-0.5">{unit.basePrice ? `₹${(unit.basePrice / 100000).toFixed(2)}L` : '—'}</dd></div>

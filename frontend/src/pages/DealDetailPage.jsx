@@ -121,7 +121,7 @@ export default function DealDetailPage() {
             <Link to={`/units/${unit._id}`}
               className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 hover:bg-primary-50 transition-colors">
               <div className="flex-1">
-                <p className="font-medium text-gray-900">Block {unit.block} – Unit {unit.unitNo}</p>
+                <p className="font-medium text-gray-900">Tower {unit.block} – Unit {unit.unitNo}</p>
                 <p className="text-sm text-gray-500">Floor {unit.floor} · {unit.bhkType}{unit.carpetArea ? ` · ${unit.carpetArea} sqft` : ''}</p>
               </div>
               <div className="text-right">

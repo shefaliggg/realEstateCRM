@@ -41,7 +41,6 @@ export default function EditProjectPage() {
     api.get(`/projects/${id}`)
       .then((res) => {
         const p = res.data
-        const pricing = p.pricing || {}
         const salesInfo = p.salesInfo || {}
         const contact = p.contact || {}
         setForm({
@@ -51,10 +50,6 @@ export default function EditProjectPage() {
           possessionDate: toDateInput(p.possessionDate), constructionStartDate: toDateInput(p.constructionStartDate),
           totalLandArea: p.totalLandArea || '', numberOfTowers: p.numberOfTowers || '', numberOfFloors: p.numberOfFloors || '',
           constructionProgressPct: p.constructionProgressPct ?? '',
-          priceStart: pricing.priceStart || '', priceEnd: pricing.priceEnd || '', basePricePerSqft: pricing.basePricePerSqft || '',
-          plcCharges: pricing.plcCharges || '', floorRiseCharges: pricing.floorRiseCharges || '', parkingCharges: pricing.parkingCharges || '',
-          clubMembershipFee: pricing.clubMembershipFee || '', gstApplicable: !!pricing.gstApplicable,
-          registrationCharges: pricing.registrationCharges || '', otherCharges: pricing.otherCharges || '',
           bookingOpen: !!salesInfo.bookingOpen, bankLoanAvailable: !!salesInfo.bankLoanAvailable,
           approvedBanksText: (salesInfo.approvedBanks || []).join(', '),
           salesOfficeAddress: salesInfo.salesOfficeAddress || '', siteOfficeContact: salesInfo.siteOfficeContact || '', crmNotes: salesInfo.crmNotes || '',
@@ -81,10 +76,6 @@ export default function EditProjectPage() {
         possessionDate: form.possessionDate || '', constructionStartDate: form.constructionStartDate || '',
         totalLandArea: form.totalLandArea, numberOfTowers: form.numberOfTowers, numberOfFloors: form.numberOfFloors,
         constructionProgressPct: form.constructionProgressPct,
-        priceStart: form.priceStart, priceEnd: form.priceEnd, basePricePerSqft: form.basePricePerSqft,
-        plcCharges: form.plcCharges, floorRiseCharges: form.floorRiseCharges, parkingCharges: form.parkingCharges,
-        clubMembershipFee: form.clubMembershipFee, gstApplicable: String(form.gstApplicable),
-        registrationCharges: form.registrationCharges, otherCharges: form.otherCharges,
         bookingOpen: String(form.bookingOpen), bankLoanAvailable: String(form.bankLoanAvailable),
         approvedBanks: JSON.stringify(form.approvedBanksText.split(',').map((s) => s.trim()).filter(Boolean)),
         salesOfficeAddress: form.salesOfficeAddress, siteOfficeContact: form.siteOfficeContact, crmNotes: form.crmNotes,
@@ -156,23 +147,6 @@ export default function EditProjectPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Pricing & Charges" icon="💰">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="Price Starts From (₹)"><input type="number" value={form.priceStart} onChange={onChange('priceStart')} className={inputCls} /></Field>
-            <Field label="Price Ends At (₹)"><input type="number" value={form.priceEnd} onChange={onChange('priceEnd')} className={inputCls} /></Field>
-            <Field label="Base Price / Sq.ft (₹)"><input type="number" value={form.basePricePerSqft} onChange={onChange('basePricePerSqft')} className={inputCls} /></Field>
-            <Field label="PLC Charges (₹)"><input type="number" value={form.plcCharges} onChange={onChange('plcCharges')} className={inputCls} /></Field>
-            <Field label="Floor Rise Charges (₹)"><input type="number" value={form.floorRiseCharges} onChange={onChange('floorRiseCharges')} className={inputCls} /></Field>
-            <Field label="Parking Charges (₹)"><input type="number" value={form.parkingCharges} onChange={onChange('parkingCharges')} className={inputCls} /></Field>
-            <Field label="Club Membership Fee (₹)"><input type="number" value={form.clubMembershipFee} onChange={onChange('clubMembershipFee')} className={inputCls} /></Field>
-            <Field label="Registration Charges (₹)"><input type="number" value={form.registrationCharges} onChange={onChange('registrationCharges')} className={inputCls} /></Field>
-            <Field label="Other Charges (₹)"><input type="number" value={form.otherCharges} onChange={onChange('otherCharges')} className={inputCls} /></Field>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={form.gstApplicable} onChange={(e) => set('gstApplicable', e.target.checked)} className="w-4 h-4 accent-primary-600" />
-            <span className="text-sm text-gray-600">GST applicable on this project</span>
-          </label>
-        </SectionCard>
 
         <SectionCard title="Sales Information" icon="💼">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

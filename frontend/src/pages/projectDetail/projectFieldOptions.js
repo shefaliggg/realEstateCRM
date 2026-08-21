@@ -1,10 +1,14 @@
 export const STATUS_OPTIONS = ['Pre-Launch', 'New Launch', 'Under Construction', 'Ready to Move', 'Completed', 'Sold Out']
 
-export const AMENITY_LIST = [
+// Society-wide amenities shared by the whole project, edited from the project Profile tab.
+export const COMMON_AMENITY_LIST = [
   'Clubhouse', 'Swimming Pool', 'Gym', 'Indoor Games', 'Outdoor Sports', 'Jogging Track',
-  "Children's Play Area", 'Multipurpose Hall', 'Power Backup', 'Lift', 'CCTV', 'Security',
-  'Visitor Parking', 'EV Charging', 'Landscaped Garden', 'Temple', 'Super Market', 'Pharmacy',
+  "Children's Play Area", 'Multipurpose Hall', 'Security', 'Visitor Parking', 'EV Charging',
+  'Landscaped Garden', 'Temple', 'Super Market', 'Pharmacy',
 ]
+
+// Amenities that can vary from one tower/block to the next, edited per tower.
+export const TOWER_AMENITY_LIST = ['Power Backup', 'Lift', 'CCTV']
 
 export const NEARBY_TYPES = ['School', 'Hospital', 'Metro', 'Railway Station', 'Airport', 'Mall', 'IT Park', 'Bus Stand']
 

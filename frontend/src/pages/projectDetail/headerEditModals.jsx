@@ -108,44 +108,6 @@ export function EditHeaderInfoModal({ id, project, onClose, onSaved }) {
   )
 }
 
-export function EditPricingModal({ id, project, onClose, onSaved }) {
-  const { save, saving, error } = useProjectSave(id, onSaved)
-  const pricing = project.pricing || {}
-  const [form, setForm] = useState({
-    priceStart: pricing.priceStart || '', priceEnd: pricing.priceEnd || '', basePricePerSqft: pricing.basePricePerSqft || '',
-    plcCharges: pricing.plcCharges || '', floorRiseCharges: pricing.floorRiseCharges || '', parkingCharges: pricing.parkingCharges || '',
-    clubMembershipFee: pricing.clubMembershipFee || '', registrationCharges: pricing.registrationCharges || '', otherCharges: pricing.otherCharges || '',
-    gstApplicable: !!pricing.gstApplicable,
-  })
-  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    const ok = await save({ ...form, gstApplicable: String(form.gstApplicable) })
-    if (ok) onClose()
-  }
-
-  return (
-    <EditModal title="Pricing & Charges" icon="💰" onClose={onClose} onSubmit={handleSubmit} saving={saving} error={error} wide>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Field label="Price Starts From (₹)"><input type="number" value={form.priceStart} onChange={set('priceStart')} className={inputCls} /></Field>
-        <Field label="Price Ends At (₹)"><input type="number" value={form.priceEnd} onChange={set('priceEnd')} className={inputCls} /></Field>
-        <Field label="Base Price / Sq.ft (₹)"><input type="number" value={form.basePricePerSqft} onChange={set('basePricePerSqft')} className={inputCls} /></Field>
-        <Field label="PLC Charges (₹)"><input type="number" value={form.plcCharges} onChange={set('plcCharges')} className={inputCls} /></Field>
-        <Field label="Floor Rise Charges (₹)"><input type="number" value={form.floorRiseCharges} onChange={set('floorRiseCharges')} className={inputCls} /></Field>
-        <Field label="Parking Charges (₹)"><input type="number" value={form.parkingCharges} onChange={set('parkingCharges')} className={inputCls} /></Field>
-        <Field label="Club Membership Fee (₹)"><input type="number" value={form.clubMembershipFee} onChange={set('clubMembershipFee')} className={inputCls} /></Field>
-        <Field label="Registration Charges (₹)"><input type="number" value={form.registrationCharges} onChange={set('registrationCharges')} className={inputCls} /></Field>
-        <Field label="Other Charges (₹)"><input type="number" value={form.otherCharges} onChange={set('otherCharges')} className={inputCls} /></Field>
-      </div>
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" checked={form.gstApplicable} onChange={(e) => setForm((f) => ({ ...f, gstApplicable: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
-        <span className="text-sm text-gray-600">GST applicable on this project</span>
-      </label>
-    </EditModal>
-  )
-}
-
 export function EditSalesStatusModal({ id, project, onClose, onSaved }) {
   const { save, saving, error } = useProjectSave(id, onSaved)
   const salesInfo = project.salesInfo || {}

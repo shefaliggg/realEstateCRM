@@ -148,7 +148,7 @@ function GenericDashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{d.dealName}</p>
                       <p className="text-xs text-gray-400">
-                        {d.unit ? `Block ${d.unit.block}-${d.unit.unitNo}` : ''}{d.lead?.name ? ` | ${d.lead.name}` : ''}
+                        {d.unit ? `Tower ${d.unit.block}-${d.unit.unitNo}` : ''}{d.lead?.name ? ` | ${d.lead.name}` : ''}
                       </p>
                     </div>
                     <div className="text-right">

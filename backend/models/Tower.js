@@ -32,6 +32,19 @@ const towerSchema = new mongoose.Schema(
       wheelchairAccess: { type: Boolean, default: false },
     },
 
+    amenities: [{ type: String }],
+    specifications: {
+      structure: String,
+      flooring: String,
+      kitchen: String,
+      bathroom: String,
+      doors: String,
+      windows: String,
+      electrical: String,
+      plumbing: String,
+      paint: String,
+    },
+
     documents: {
       floorPlans: [{ type: String, trim: true }],
       towerLayout: String,

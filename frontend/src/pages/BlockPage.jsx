@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
+import { amenityIcon } from './projectDetail/shared'
+import { EditPencilButton, Modal } from './projectDetail/editShared'
+import { EditTowerAmenitiesModal, EditTowerSpecificationsModal } from './projectDetail/towerEditModals'
+import { EditUnitModal } from './projectDetail/unitEditModals'
+import BulkCreateFlatsPanel from './projectDetail/BulkCreateFlatsPanel'
 
 const STATUS_COLORS = {
   Available: 'bg-green-100 text-green-700 border-green-200',
@@ -26,8 +31,13 @@ function formatPrice(v) {
   return `₹${n.toLocaleString('en-IN')}`
 }
 
-function FlatCard({ unit }) {
+function FlatCard({ unit, onEdit }) {
   const price = unit.totalPrice || unit.basePrice
+  const handleEdit = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onEdit(unit)
+  }
   return (
     <Link
       to={`/units/${unit._id}`}
@@ -38,9 +48,14 @@ function FlatCard({ unit }) {
           <h4 className="font-semibold text-gray-900 truncate">Flat {unit.unitNo}</h4>
           <p className="text-xs text-gray-400">Floor {unit.floor} · {unit.bhkType}{unit.cornerUnit ? ' · Corner' : ''}</p>
         </div>
-        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
-          {unit.status}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
+            {unit.status}
+          </span>
+          <button type="button" onClick={handleEdit} title="Edit Flat" className="h-6 w-6 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-primary-600 transition-colors">
+            ✏️
+          </button>
+        </div>
       </div>
       <div className="flex items-center justify-between text-sm mb-2">
         <span className="text-gray-600">{unit.carpetArea ? `${unit.carpetArea} Sq.ft` : '—'}</span>
@@ -56,26 +71,57 @@ function FlatCard({ unit }) {
 
 export default function BlockPage() {
   const { projectId, block } = useParams()
+  const navigate = useNavigate()
   const [project, setProject] = useState(null)
   const [units, setUnits] = useState([])
+  const [tower, setTower] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [bhkFilter, setBhkFilter] = useState('All')
   const [view, setView] = useState('cards')
+  const [towerModal, setTowerModal] = useState(null)
+  const [tab, setTab] = useState('details')
+  const [editingUnit, setEditingUnit] = useState(null)
+  const [showBulkAdd, setShowBulkAdd] = useState(false)
+  const [confirmDeleteTower, setConfirmDeleteTower] = useState(false)
+  const [deletingTower, setDeletingTower] = useState(false)
+
+  const refetchUnits = useCallback(() => {
+    api.get(`/projects/${projectId}/units`, { params: { block } }).then((res) => setUnits(res.data)).catch(() => {})
+  }, [projectId, block])
 
   useEffect(() => {
     Promise.all([
       api.get(`/projects/${projectId}`),
-      api.get(`/projects/${projectId}/units`),
+      api.get(`/projects/${projectId}/units`, { params: { block } }),
+      api.get(`/projects/${projectId}/towers`, { params: { name: block } }),
     ])
-      .then(([pRes, uRes]) => {
+      .then(([pRes, uRes, towersRes]) => {
         setProject(pRes.data)
-        setUnits(uRes.data.filter(u => u.block === block))
+        setUnits(uRes.data)
+        setTower(towersRes.data[0] || null)
       })
       .catch(() => setError('Failed to load block data'))
       .finally(() => setLoading(false))
   }, [projectId, block])
+
+  const handleUnitSaved = (updated) => {
+    setUnits((prev) => prev.map((u) => (u._id === updated._id ? updated : u)))
+  }
+
+  const handleDeleteTower = async () => {
+    if (!tower) return
+    if (!confirmDeleteTower) { setConfirmDeleteTower(true); return }
+    setDeletingTower(true)
+    try {
+      await api.delete(`/projects/${projectId}/towers/${tower._id}`)
+      navigate(`/projects/${projectId}`)
+    } catch {
+      setDeletingTower(false)
+      setConfirmDeleteTower(false)
+    }
+  }
 
   const filtered = units.filter(u => {
     if (statusFilter !== 'All' && u.status !== statusFilter) return false
@@ -104,22 +150,62 @@ export default function BlockPage() {
         <span>/</span>
         <Link to={`/projects/${projectId}`} className="hover:text-primary-600">{project?.name}</Link>
         <span>/</span>
-        <span className="text-gray-900 font-medium">Block {block}</span>
+        <span className="text-gray-900 font-medium">Tower {block}</span>
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Block {block}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Tower {block}</h1>
         </div>
-        <Link
-          to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          + Add Flat
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
+            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + Add Flat
+          </Link>
+          <button
+            type="button"
+            onClick={() => setShowBulkAdd(true)}
+            className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + Bulk Add Flats
+          </button>
+        </div>
       </div>
 
+      {showBulkAdd && (
+        <Modal title="Bulk Add Flats" icon="⭐" onClose={() => setShowBulkAdd(false)} wide>
+          <BulkCreateFlatsPanel
+            id={projectId}
+            towers={[block]}
+            onCreated={() => { refetchUnits(); setShowBulkAdd(false) }}
+            embedded
+          />
+        </Modal>
+      )}
+
+      {/* Tabs */}
+      <div className="flex flex-wrap border-b border-gray-200 mb-5">
+        {[
+          { key: 'details', label: 'Details' },
+          { key: 'flats', label: 'Flat List' },
+        ].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === key ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'details' && (
+        <>
       {/* Stats */}
       <div className="flex flex-wrap gap-3 mb-6">
         {[
@@ -135,6 +221,103 @@ export default function BlockPage() {
         ))}
       </div>
 
+      {/* Tower Profile */}
+      <div className="mb-6">
+        {tower ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-800">🏊 Tower Amenities</h3>
+                <EditPencilButton onClick={() => setTowerModal('amenities')} />
+              </div>
+              {tower.amenities?.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {tower.amenities.map((a) => (
+                    <span key={a} className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                      <span className="leading-none">{amenityIcon(a)}</span> {a}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">No amenities added yet.</p>
+              )}
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-800">🧱 Specifications</h3>
+                <EditPencilButton onClick={() => setTowerModal('specs')} />
+              </div>
+              {Object.values(tower.specifications || {}).some(Boolean) ? (
+                <dl className="space-y-2 text-sm">
+                  {Object.entries({
+                    Structure: tower.specifications?.structure, Flooring: tower.specifications?.flooring, Kitchen: tower.specifications?.kitchen,
+                    Bathroom: tower.specifications?.bathroom, Doors: tower.specifications?.doors, Windows: tower.specifications?.windows,
+                    Electrical: tower.specifications?.electrical, Plumbing: tower.specifications?.plumbing, Paint: tower.specifications?.paint,
+                  }).filter(([, v]) => v).map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-4"><dt className="text-gray-500">{label}</dt><dd className="font-medium text-right">{value}</dd></div>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-xs text-gray-400">No specifications added yet.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-6 text-center">
+            <p className="text-sm text-gray-600 font-medium mb-1">No tower profile yet for Tower {block}</p>
+            <p className="text-xs text-gray-400 mb-3">Create a tower profile to set amenities and specifications for this block.</p>
+            <Link
+              to={`/projects/${projectId}/towers/add?name=${encodeURIComponent(block)}`}
+              className="inline-block bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Create Tower Profile
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {tower && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">Tower Configuration</h3>
+              <p className="text-sm text-gray-500 mt-0.5">Update name, floors, lifts, features, documents, and assigned team.</p>
+            </div>
+            <Link
+              to={`/projects/${projectId}/towers/${tower._id}/edit`}
+              className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors shrink-0"
+            >
+              ✏️ Edit Tower
+            </Link>
+          </div>
+
+          <div className="rounded-xl border border-red-200 bg-red-50 p-5">
+            <h3 className="font-semibold text-red-800 mb-1">Danger Zone</h3>
+            <p className="text-sm text-red-600 mb-3">Deleting a tower permanently removes it. This cannot be undone.</p>
+            <button
+              type="button"
+              onClick={handleDeleteTower}
+              disabled={deletingTower}
+              className="text-sm font-medium px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {deletingTower ? 'Deleting...' : confirmDeleteTower ? 'Click again to confirm delete' : 'Delete Tower'}
+            </button>
+          </div>
+        </div>
+      )}
+        </>
+      )}
+
+      {towerModal === 'amenities' && tower && (
+        <EditTowerAmenitiesModal towerId={tower._id} tower={tower} onClose={() => setTowerModal(null)} onSaved={setTower} />
+      )}
+      {towerModal === 'specs' && tower && (
+        <EditTowerSpecificationsModal towerId={tower._id} tower={tower} onClose={() => setTowerModal(null)} onSaved={setTower} />
+      )}
+
+      {tab === 'flats' && (
+        <>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <select
@@ -186,7 +369,7 @@ export default function BlockPage() {
       {units.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm">
           <p className="text-4xl mb-3">🏢</p>
-          <p className="text-gray-600 font-medium mb-1">No flats in Block {block} yet</p>
+          <p className="text-gray-600 font-medium mb-1">No flats in Tower {block} yet</p>
           <p className="text-sm text-gray-400 mb-5">Start adding flats to build your inventory</p>
           <Link
             to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
@@ -206,7 +389,7 @@ export default function BlockPage() {
                 {filtered
                   .filter(u => u.floor === floor)
                   .sort((a, b) => String(a.unitNo).localeCompare(String(b.unitNo), undefined, { numeric: true }))
-                  .map(u => <FlatCard key={u._id} unit={u} />)}
+                  .map(u => <FlatCard key={u._id} unit={u} onEdit={setEditingUnit} />)}
               </div>
             </div>
           ))}
@@ -222,20 +405,41 @@ export default function BlockPage() {
                     .filter(u => u.floor === floor)
                     .sort((a, b) => String(a.unitNo).localeCompare(String(b.unitNo), undefined, { numeric: true }))
                     .map(u => (
-                      <Link
-                        key={u._id}
-                        to={`/units/${u._id}`}
-                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:opacity-80 transition-opacity ${STATUS_COLORS[u.status] || 'bg-gray-100 text-gray-600'}`}
-                        title={`${u.bhkType}${u.carpetArea ? ' · ' + u.carpetArea + ' sqft' : ''}${u.basePrice ? ' · ₹' + (u.basePrice / 100000).toFixed(1) + 'L' : ''}`}
-                      >
-                        {u.unitNo}
-                      </Link>
+                      <div key={u._id} className="inline-flex items-center gap-1">
+                        <Link
+                          to={`/units/${u._id}`}
+                          className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium hover:opacity-80 transition-opacity ${STATUS_COLORS[u.status] || 'bg-gray-100 text-gray-600'}`}
+                          title={`${u.bhkType}${u.carpetArea ? ' · ' + u.carpetArea + ' sqft' : ''}${u.basePrice ? ' · ₹' + (u.basePrice / 100000).toFixed(1) + 'L' : ''}`}
+                        >
+                          {u.unitNo}
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setEditingUnit(u)}
+                          title="Edit Flat"
+                          className="h-6 w-6 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-primary-600 transition-colors"
+                        >
+                          ✏️
+                        </button>
+                      </div>
                     ))}
                 </div>
               </div>
             ))}
           </div>
         </div>
+      )}
+        </>
+      )}
+
+      {editingUnit && (
+        <EditUnitModal
+          projectId={projectId}
+          unit={editingUnit}
+          bhkTypeOptions={project?.bhkTypes}
+          onClose={() => setEditingUnit(null)}
+          onSaved={handleUnitSaved}
+        />
       )}
     </div>
   )

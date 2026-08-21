@@ -136,7 +136,7 @@ export default function AllDealsPage() {
                         <td className="px-5 py-4 font-medium text-gray-900">{d.dealName}</td>
                         <td className="px-5 py-4 text-gray-600">
                           {d.unit
-                            ? `Block ${d.unit.block} – ${d.unit.unitNo} (F${d.unit.floor})`
+                            ? `Tower ${d.unit.block} – ${d.unit.unitNo} (F${d.unit.floor})`
                             : '—'}
                         </td>
                         <td className="px-5 py-4 text-gray-600">{d.lead?.name || '—'}</td>

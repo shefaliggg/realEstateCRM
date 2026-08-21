@@ -134,8 +134,8 @@ export default function InventoryPage() {
             <>
               <select value={blockFilter} onChange={e => setBlockFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
-                <option value="All">All Blocks</option>
-                {blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
+                <option value="All">All Towers</option>
+                {blocks.map(b => <option key={b} value={b}>Tower {b}</option>)}
               </select>
               <select value={bhkFilter} onChange={e => setBhkFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
@@ -175,7 +175,7 @@ export default function InventoryPage() {
                         <>Plot {u.unitNo}</>
                       ) : (
                         <>
-                          Block {u.block} – {u.unitNo}&nbsp;
+                          Tower {u.block} – {u.unitNo}&nbsp;
                           <span className="text-xs text-gray-400">F{u.floor}</span>
                         </>
                       )}

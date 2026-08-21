@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { formatPrice, formatDate, getInitials } from './projectDetail/shared'
 import { EditPencilButton, HoverPhotoEdit } from './projectDetail/editShared'
-import { EditCoverPhotoModal, EditLogoModal, EditHeaderInfoModal, EditPricingModal, EditSalesStatusModal } from './projectDetail/headerEditModals'
+import { EditCoverPhotoModal, EditLogoModal, EditHeaderInfoModal, EditSalesStatusModal } from './projectDetail/headerEditModals'
 import OverviewTab from './projectDetail/OverviewTab'
 import ProfileTab from './projectDetail/ProfileTab'
 import TowersTab from './projectDetail/TowersTab'
@@ -13,14 +13,6 @@ import GalleryTab from './projectDetail/GalleryTab'
 import ActivityTab from './projectDetail/ActivityTab'
 import TeamTab from './projectDetail/TeamTab'
 import SettingsTab from './projectDetail/SettingsTab'
-
-const PROFILE_TYPE_CONFIG = {
-  Buildings: { totalLabel: 'Total Units', amenitiesTitle: 'Amenities', descriptionTitle: 'Description' },
-  Villas: { totalLabel: 'Total Villas', amenitiesTitle: 'Amenities', descriptionTitle: 'Description' },
-  Plots: { totalLabel: 'Total Plots', amenitiesTitle: 'Layout Amenities', descriptionTitle: 'Layout Description' },
-  Commercial: { totalLabel: 'Total Spaces', amenitiesTitle: 'Commercial Amenities', descriptionTitle: 'Commercial Description' },
-  'Mixed Use': { totalLabel: 'Total Units/Spaces', amenitiesTitle: 'Amenities', descriptionTitle: 'Project Description' },
-}
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
@@ -53,9 +45,6 @@ export default function ProjectDetailPage() {
 
   const refetchUnits = useCallback(() => {
     api.get(`/projects/${id}/units`).then((res) => setUnits(res.data)).catch(() => {})
-  }, [id])
-  const refetchTowers = useCallback(() => {
-    api.get(`/projects/${id}/towers`).then((res) => setTowers(res.data)).catch(() => {})
   }, [id])
 
   useEffect(() => {
@@ -92,8 +81,6 @@ export default function ProjectDetailPage() {
   if (error) return <div className="p-6 text-red-500">{error}</div>
   if (!project) return null
 
-  const projectType = project.type || 'Buildings'
-  const profileTypeConfig = PROFILE_TYPE_CONFIG[projectType] || PROFILE_TYPE_CONFIG.Buildings
   const userById = new Map(users.map((u) => [u._id, u]))
 
   const locationParts = [
@@ -105,10 +92,14 @@ export default function ProjectDetailPage() {
   const mapSrc = locationText ? `https://www.google.com/maps?q=${encodeURIComponent(locationText)}&z=15&output=embed` : ''
   const mapActionLink = googleMapLink || (locationText ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationText)}` : '')
 
-  const pricing = project.pricing || {}
-  const priceLabel = pricing.priceStart && pricing.priceEnd
-    ? `${formatPrice(pricing.priceStart)} - ${formatPrice(pricing.priceEnd)}`
-    : pricing.priceStart ? `From ${formatPrice(pricing.priceStart)}` : 'Price on request'
+  // Pricing is flat-specific (it can vary unit to unit), so the header shows the range
+  // across all of this project's units rather than a single project-wide price.
+  const unitPrices = units.map((u) => u.totalPrice || u.basePrice).filter((n) => n > 0)
+  const minPrice = unitPrices.length ? Math.min(...unitPrices) : null
+  const maxPrice = unitPrices.length ? Math.max(...unitPrices) : null
+  const priceLabel = minPrice && maxPrice && minPrice !== maxPrice
+    ? `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
+    : minPrice ? `From ${formatPrice(minPrice)}` : 'Price on request'
 
   const assignedUsers = Array.isArray(project.managedBy) ? project.managedBy : []
   const heroImage = project.coverImage || (project.images || [])[0] || ''
@@ -172,10 +163,8 @@ export default function ProjectDetailPage() {
               </div>
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">Price</p>
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-gray-900">{priceLabel}</p>
-                  <EditPencilButton onClick={() => setHeaderModal('pricing')} label="" />
-                </div>
+                <p className="font-bold text-gray-900">{priceLabel}</p>
+                <p className="text-[10px] text-gray-400">Set per tower</p>
               </div>
             </div>
 
@@ -195,7 +184,6 @@ export default function ProjectDetailPage() {
       {headerModal === 'cover' && <EditCoverPhotoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
       {headerModal === 'logo' && <EditLogoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
       {headerModal === 'info' && <EditHeaderInfoModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
-      {headerModal === 'pricing' && <EditPricingModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
       {headerModal === 'sales' && <EditSalesStatusModal id={id} project={project} onClose={() => setHeaderModal(null)} onSaved={handleProjectChanged} />}
 
       <div>
@@ -222,11 +210,11 @@ export default function ProjectDetailPage() {
         )}
         {tab === 'profile' && (
           <ProfileTab
-            id={id} project={project} profileTypeConfig={profileTypeConfig} locationText={locationText} mapSrc={mapSrc} mapActionLink={mapActionLink}
+            id={id} project={project} locationText={locationText} mapSrc={mapSrc} mapActionLink={mapActionLink}
             onProjectChanged={handleProjectChanged}
           />
         )}
-        {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} onTowersChanged={refetchTowers} />}
+        {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} />}
         {tab === 'inventory' && <InventoryTab id={id} project={project} units={units} onUnitsChanged={refetchUnits} />}
         {tab === 'documents' && <DocumentsTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
         {tab === 'gallery' && <GalleryTab id={id} project={project} onProjectChanged={handleProjectChanged} />}

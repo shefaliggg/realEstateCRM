@@ -221,7 +221,7 @@ export default function LeadDetailPage() {
               {lead.unitInterest.map(u => (
                 <Link key={u._id || u} to={`/units/${u._id || u}`}
                   className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 hover:bg-primary-50 transition-colors text-sm">
-                  <span className="font-medium">Block {u.block} – {u.unitNo}</span>
+                  <span className="font-medium">Tower {u.block} – {u.unitNo}</span>
                   <span className="text-gray-400">{u.bhkType}</span>
                   {u.status && (
                     <span className="ml-auto text-xs bg-white border px-2 py-0.5 rounded-full">{u.status}</span>

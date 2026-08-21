@@ -1,6 +1,7 @@
 const Tower = require('../models/Tower')
 const Project = require('../models/Project')
 const Unit = require('../models/Unit')
+const { parseArrayField, flattenNestedGroupsForUpdate } = require('../utils/nestedPayload')
 
 const uploadedFileUrl = (bucket) =>
   bucket && bucket[0] ? `/uploads/project-images/${bucket[0].filename}` : undefined
@@ -8,6 +9,9 @@ const uploadedFileUrl = (bucket) =>
 const uploadedFileUrls = (bucket) => (bucket || []).map((file) => `/uploads/project-images/${file.filename}`)
 
 const parseBoolean = (value) => value === 'true' || value === true
+
+const SPEC_FIELDS = ['structure', 'flooring', 'kitchen', 'bathroom', 'doors', 'windows', 'electrical', 'plumbing', 'paint']
+const NESTED_GROUP_KEYS = ['specifications']
 
 const buildPayload = (body, files = {}) => {
   const payload = {}
@@ -32,6 +36,15 @@ const buildPayload = (body, files = {}) => {
 
   if (body.siteEngineer !== undefined) payload.siteEngineer = body.siteEngineer || null
   if (body.salesManager !== undefined) payload.salesManager = body.salesManager || null
+
+  const amenities = parseArrayField(body.amenities)
+  if (amenities !== undefined) payload.amenities = amenities
+
+  const hasSpecInput = SPEC_FIELDS.some((f) => body[f] !== undefined)
+  if (hasSpecInput) {
+    payload.specifications = {}
+    SPEC_FIELDS.forEach((field) => { payload.specifications[field] = body[field] || '' })
+  }
 
   const floorPlans = uploadedFileUrls(files.floorPlans)
   const towerLayout = uploadedFileUrl(files.towerLayout)
@@ -69,6 +82,7 @@ const getTowers = async (req, res) => {
     const filter = { builderId: req.builderId }
     if (req.params.projectId) filter.project = req.params.projectId
     else if (req.query.project) filter.project = req.query.project
+    if (req.query.name) filter.name = req.query.name
     const towers = await Tower.find(filter)
       .populate('siteEngineer', 'name email')
       .populate('salesManager', 'name email')
@@ -118,7 +132,7 @@ const createTower = async (req, res) => {
 
 const updateTower = async (req, res) => {
   try {
-    const payload = buildPayload(req.body, req.files || {})
+    const payload = flattenNestedGroupsForUpdate(buildPayload(req.body, req.files || {}), NESTED_GROUP_KEYS)
     const tower = await Tower.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, payload, { new: true, runValidators: true })
     if (!tower) return res.status(404).json({ message: 'Tower not found' })
     res.json(tower)

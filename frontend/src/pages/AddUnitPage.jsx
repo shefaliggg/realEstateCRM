@@ -79,7 +79,7 @@ export default function AddUnitPage() {
       return
     }
     if (!isPlotProject && (!form.block || !form.floor || !form.unitNo)) {
-      setError('Block, floor and unit number are required')
+      setError('Tower, floor and unit number are required')
       return
     }
     setLoading(true)
@@ -136,7 +136,7 @@ export default function AddUnitPage() {
         {blockFromUrl && (
           <>
             <span>/</span>
-            <Link to={`/projects/${projectId}/blocks/${blockFromUrl}`} className="hover:text-primary-600">Block {blockFromUrl}</Link>
+            <Link to={`/projects/${projectId}/blocks/${blockFromUrl}`} className="hover:text-primary-600">Tower {blockFromUrl}</Link>
           </>
         )}
         <span>/</span>
@@ -144,7 +144,7 @@ export default function AddUnitPage() {
       </div>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        {isPlotProject ? '📍 Add Plot' : `🏠 Add Flat${blockFromUrl ? ` — Block ${blockFromUrl}` : ''}`}
+        {isPlotProject ? '📍 Add Plot' : `🏠 Add Flat${blockFromUrl ? ` — Tower ${blockFromUrl}` : ''}`}
       </h1>
 
       {error && (
@@ -156,12 +156,12 @@ export default function AddUnitPage() {
           <div className="grid grid-cols-2 gap-4">
             {!isPlotProject && (
               <>
-                <Field label="Block *">
+                <Field label="Tower *">
                   {blockFromUrl ? (
-                    <div className={`${inputCls} bg-gray-50 text-gray-700`}>Block {blockFromUrl}</div>
+                    <div className={`${inputCls} bg-gray-50 text-gray-700`}>Tower {blockFromUrl}</div>
                   ) : project?.blocks?.length > 0 ? (
                     <select name="block" value={form.block} onChange={handleChange} className={inputCls}>
-                      {project.blocks.map(b => <option key={b} value={b}>Block {b}</option>)}
+                      {project.blocks.map(b => <option key={b} value={b}>Tower {b}</option>)}
                     </select>
                   ) : (
                     <input name="block" value={form.block} onChange={handleChange} required className={inputCls} placeholder="A" />

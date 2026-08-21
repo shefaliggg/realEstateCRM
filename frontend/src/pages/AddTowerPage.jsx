@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import api from '../api/axios'
+import { amenityIcon } from './projectDetail/shared'
+import { SpecSelectField } from './projectDetail/editShared'
+import {
+  TOWER_AMENITY_LIST, STRUCTURE_OPTIONS, FLOORING_OPTIONS, KITCHEN_OPTIONS, BATHROOM_OPTIONS,
+  DOORS_OPTIONS, WINDOWS_OPTIONS, ELECTRICAL_OPTIONS, PLUMBING_OPTIONS, PAINT_OPTIONS,
+} from './projectDetail/projectFieldOptions'
 
 const STATUS_OPTIONS = ['Planned', 'Under Construction', 'Ready']
 const FEATURES = [
@@ -41,14 +47,16 @@ const EMPTY_FORM = {
   constructionStartDate: '', completionDate: '', occupancyCertificate: false, fireNOC: false,
   serviceLift: false, passengerLift: false, generatorBackup: false, cctv: false, fireSafety: false, garbageChute: false, wheelchairAccess: false,
   siteEngineer: '', salesManager: '',
+  amenities: [], structure: '', flooring: '', kitchen: '', bathroom: '', doors: '', windows: '', electrical: '', plumbing: '', paint: '',
 }
 
 export default function AddTowerPage() {
   const { projectId, towerId } = useParams()
+  const [searchParams] = useSearchParams()
   const isEdit = Boolean(towerId)
   const navigate = useNavigate()
   const [project, setProject] = useState(null)
-  const [form, setForm] = useState(EMPTY_FORM)
+  const [form, setForm] = useState(() => (isEdit ? EMPTY_FORM : { ...EMPTY_FORM, name: searchParams.get('name') || '' }))
   const [files, setFiles] = useState({ floorPlans: [], towerLayout: null, elevationDrawing: null })
   const [users, setUsers] = useState([])
   const [error, setError] = useState('')
@@ -63,6 +71,7 @@ export default function AddTowerPage() {
     if (!isEdit) return
     api.get(`/towers/${towerId}`).then((r) => {
       const t = r.data
+      const specs = t.specifications || {}
       setForm({
         name: t.name || '', code: t.code || '', status: t.status || 'Planned',
         numberOfFloors: t.numberOfFloors ?? '', numberOfBasements: t.numberOfBasements ?? '', numberOfLifts: t.numberOfLifts ?? '', numberOfFlats: t.numberOfFlats ?? '',
@@ -75,12 +84,16 @@ export default function AddTowerPage() {
         fireSafety: Boolean(t.features?.fireSafety), garbageChute: Boolean(t.features?.garbageChute),
         wheelchairAccess: Boolean(t.features?.wheelchairAccess),
         siteEngineer: t.siteEngineer?._id || '', salesManager: t.salesManager?._id || '',
+        amenities: t.amenities || [],
+        structure: specs.structure || '', flooring: specs.flooring || '', kitchen: specs.kitchen || '', bathroom: specs.bathroom || '',
+        doors: specs.doors || '', windows: specs.windows || '', electrical: specs.electrical || '', plumbing: specs.plumbing || '', paint: specs.paint || '',
       })
     }).catch(() => setError('Failed to load tower'))
   }, [isEdit, towerId])
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }))
   const onChange = (key) => (e) => set(key, e.target.value)
+  const toggleAmenity = (a) => setForm((f) => ({ ...f, amenities: f.amenities.includes(a) ? f.amenities.filter((x) => x !== a) : [...f.amenities, a] }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -105,6 +118,16 @@ export default function AddTowerPage() {
       FEATURES.forEach(([key]) => fd.append(key, String(form[key])))
       append('siteEngineer', form.siteEngineer)
       append('salesManager', form.salesManager)
+      fd.append('amenities', JSON.stringify(form.amenities))
+      append('structure', form.structure)
+      append('flooring', form.flooring)
+      append('kitchen', form.kitchen)
+      append('bathroom', form.bathroom)
+      append('doors', form.doors)
+      append('windows', form.windows)
+      append('electrical', form.electrical)
+      append('plumbing', form.plumbing)
+      append('paint', form.paint)
       if (files.towerLayout) fd.append('towerLayout', files.towerLayout)
       if (files.elevationDrawing) fd.append('elevationDrawing', files.elevationDrawing)
       files.floorPlans.forEach((f) => fd.append('floorPlans', f))
@@ -184,6 +207,36 @@ export default function AddTowerPage() {
                 {form[key] && <span className="mr-1">✓</span>}{label}
               </button>
             ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Tower-Specific Amenities" icon="🏊">
+          <div className="flex flex-wrap gap-2">
+            {TOWER_AMENITY_LIST.map((a) => {
+              const selected = form.amenities.includes(a)
+              return (
+                <button key={a} type="button" onClick={() => toggleAmenity(a)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition font-medium ${
+                    selected ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:text-primary-700'
+                  }`}>
+                  <span className="mr-1">{amenityIcon(a)}</span>{a}
+                </button>
+              )
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Specifications" icon="🧱">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SpecSelectField label="Structure" value={form.structure} onChange={(v) => set('structure', v)} options={STRUCTURE_OPTIONS} />
+            <SpecSelectField label="Flooring" value={form.flooring} onChange={(v) => set('flooring', v)} options={FLOORING_OPTIONS} />
+            <SpecSelectField label="Kitchen" value={form.kitchen} onChange={(v) => set('kitchen', v)} options={KITCHEN_OPTIONS} />
+            <SpecSelectField label="Bathroom" value={form.bathroom} onChange={(v) => set('bathroom', v)} options={BATHROOM_OPTIONS} />
+            <SpecSelectField label="Doors" value={form.doors} onChange={(v) => set('doors', v)} options={DOORS_OPTIONS} />
+            <SpecSelectField label="Windows" value={form.windows} onChange={(v) => set('windows', v)} options={WINDOWS_OPTIONS} />
+            <SpecSelectField label="Electrical" value={form.electrical} onChange={(v) => set('electrical', v)} options={ELECTRICAL_OPTIONS} />
+            <SpecSelectField label="Plumbing" value={form.plumbing} onChange={(v) => set('plumbing', v)} options={PLUMBING_OPTIONS} />
+            <SpecSelectField label="Paint" value={form.paint} onChange={(v) => set('paint', v)} options={PAINT_OPTIONS} />
           </div>
         </SectionCard>
 

@@ -11,8 +11,8 @@ const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3
 
 const inputCls = 'text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white'
 
-export default function BulkCreateFlatsPanel({ id, towers, onCreated }) {
-  const [open, setOpen] = useState(false)
+export default function BulkCreateFlatsPanel({ id, towers, onCreated, embedded = false }) {
+  const [open, setOpen] = useState(embedded)
   const [tower, setTower] = useState(towers[0] || '')
   const [startFloor, setStartFloor] = useState('1')
   const [endFloor, setEndFloor] = useState('1')
@@ -67,15 +67,8 @@ export default function BulkCreateFlatsPanel({ id, towers, onCreated }) {
     return null
   }
 
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
-        <h3 className="font-semibold text-gray-800">⭐ Bulk Create Flats</h3>
-        <span className="text-xs text-primary-600 font-medium">{open ? 'Hide' : 'Open'}</span>
-      </button>
-
-      {open && (
-        <div className="mt-4 space-y-4">
+  const form = (
+    <div className={embedded ? 'space-y-4' : 'mt-4 space-y-4'}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Tower</label>
@@ -156,8 +149,18 @@ export default function BulkCreateFlatsPanel({ id, towers, onCreated }) {
           >
             {busy ? 'Generating...' : `Generate ${generated.length} Unit${generated.length !== 1 ? 's' : ''}`}
           </button>
-        </div>
-      )}
+    </div>
+  )
+
+  if (embedded) return form
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
+        <h3 className="font-semibold text-gray-800">⭐ Bulk Create Flats</h3>
+        <span className="text-xs text-primary-600 font-medium">{open ? 'Hide' : 'Open'}</span>
+      </button>
+      {open && form}
     </div>
   )
 }

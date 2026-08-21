@@ -201,7 +201,7 @@ export default function PostSalesDocumentsPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Document Name *</label>
-                <input className={inputClass} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sale Agreement - Block A.pdf" />
+                <input className={inputClass} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Sale Agreement - Tower A.pdf" />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowAdd(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Cancel</button>

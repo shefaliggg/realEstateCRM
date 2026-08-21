@@ -146,7 +146,7 @@ export function computeActivityEvents(units, bookings, payments, userById, limit
   const unitEvents = units.flatMap((u) =>
     (u.statusHistory || []).map((h) => ({
       date: h.changedAt,
-      text: `Unit ${u.unitNo}${u.block ? ` (Block ${u.block})` : ''} marked ${h.status}${h.note ? ` — ${h.note}` : ''}`,
+      text: `Unit ${u.unitNo}${u.block ? ` (Tower ${u.block})` : ''} marked ${h.status}${h.note ? ` — ${h.note}` : ''}`,
       actor: userById.get(h.changedBy) || userById.get(h.changedBy?._id),
     }))
   )

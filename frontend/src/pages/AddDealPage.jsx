@@ -101,7 +101,7 @@ export default function AddDealPage() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Deal Name *</label>
                 <input value={form.dealName} onChange={e => set('dealName', e.target.value)} required
-                  className={cls} placeholder="Deal for Block A-301" />
+                  className={cls} placeholder="Deal for Tower A-301" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Stage</label>
@@ -139,7 +139,7 @@ export default function AddDealPage() {
                     <option value="">Select unit...</option>
                     {filteredUnits.map(u => (
                       <option key={u._id} value={u._id}>
-                        Block {u.block} – {u.unitNo} (Floor {u.floor}) · {u.bhkType}{u.carpetArea ? ` · ${u.carpetArea} sqft` : ''}{u.basePrice ? ` · ₹${(u.basePrice / 100000).toFixed(1)}L` : ''}
+                        Tower {u.block} – {u.unitNo} (Floor {u.floor}) · {u.bhkType}{u.carpetArea ? ` · ${u.carpetArea} sqft` : ''}{u.basePrice ? ` · ₹${(u.basePrice / 100000).toFixed(1)}L` : ''}
                       </option>
                     ))}
                   </select>

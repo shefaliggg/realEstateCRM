@@ -1,20 +1,6 @@
 const Project = require('../models/Project')
 const Unit = require('../models/Unit')
-
-const parseArrayField = (value) => {
-  if (Array.isArray(value)) return value
-  if (typeof value !== 'string') return undefined
-
-  const trimmed = value.trim()
-  if (!trimmed) return []
-
-  try {
-    const parsed = JSON.parse(trimmed)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return trimmed.split(',').map((item) => item.trim()).filter(Boolean)
-  }
-}
+const { parseArrayField, flattenNestedGroupsForUpdate } = require('../utils/nestedPayload')
 
 const parseNumberField = (value) => {
   if (value === undefined || value === '') return undefined
@@ -42,8 +28,6 @@ const LOCATION_FIELDS = ['country', 'state', 'city', 'locality', 'address', 'lan
 const LOCATION_NUMBER_FIELDS = ['latitude', 'longitude']
 const DATE_FIELDS = ['reraRegistrationDate', 'launchDate', 'possessionDate', 'constructionStartDate']
 const COUNT_FIELDS = ['numberOfTowers', 'numberOfFloors', 'totalUnits', 'totalBlocks', 'constructionProgressPct']
-const PRICING_NUMBER_FIELDS = ['priceStart', 'priceEnd', 'basePricePerSqft', 'plcCharges', 'floorRiseCharges', 'parkingCharges', 'clubMembershipFee', 'registrationCharges', 'otherCharges']
-const SPEC_FIELDS = ['structure', 'flooring', 'kitchen', 'bathroom', 'doors', 'windows', 'electrical', 'plumbing', 'paint']
 const SALES_INFO_TEXT_FIELDS = ['salesOfficeAddress', 'siteOfficeContact', 'crmNotes']
 const CONTACT_FIELDS = ['salesPhone', 'alternatePhone', 'whatsapp', 'email', 'website']
 const SEO_TEXT_FIELDS = ['slug', 'metaTitle', 'metaDescription']
@@ -72,19 +56,6 @@ const normalizeProjectPayload = (body, files = []) => {
     payload.location = {}
     LOCATION_FIELDS.forEach((field) => { payload.location[field] = body[field] || '' })
     LOCATION_NUMBER_FIELDS.forEach((field) => { payload.location[field] = parseNumberField(body[field]) })
-  }
-
-  const hasPricingInput = [...PRICING_NUMBER_FIELDS, 'gstApplicable'].some((f) => body[f] !== undefined)
-  if (hasPricingInput) {
-    payload.pricing = {}
-    PRICING_NUMBER_FIELDS.forEach((field) => { payload.pricing[field] = parseNumberField(body[field]) })
-    if (body.gstApplicable !== undefined) payload.pricing.gstApplicable = parseBooleanField(body.gstApplicable)
-  }
-
-  const hasSpecInput = SPEC_FIELDS.some((f) => body[f] !== undefined)
-  if (hasSpecInput) {
-    payload.specifications = {}
-    SPEC_FIELDS.forEach((field) => { payload.specifications[field] = body[field] || '' })
   }
 
   const hasSalesInfoInput = [...SALES_INFO_TEXT_FIELDS, 'bookingOpen', 'bankLoanAvailable', 'approvedBanks'].some((f) => body[f] !== undefined)
@@ -190,23 +161,7 @@ const normalizeProjectPayload = (body, files = []) => {
   return payload
 }
 
-// Nested object paths (location, pricing, documents, etc.) are stored as plain embedded objects,
-// so a findOneAndUpdate $set on the group key replaces the whole object and silently drops any
-// sibling fields the request didn't include. Flattening to dot-notation before an update makes
-// each sub-field an independent $set target instead. Only safe for updates — the `new Project(...)`
-// constructor used on create does not expand dot-notation keys into nested paths.
-const NESTED_GROUP_KEYS = ['location', 'pricing', 'specifications', 'salesInfo', 'contact', 'seo', 'documents']
-
-const flattenNestedGroupsForUpdate = (payload) => {
-  NESTED_GROUP_KEYS.forEach((key) => {
-    const value = payload[key]
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      Object.entries(value).forEach(([subKey, subValue]) => { payload[`${key}.${subKey}`] = subValue })
-      delete payload[key]
-    }
-  })
-  return payload
-}
+const NESTED_GROUP_KEYS = ['location', 'salesInfo', 'contact', 'seo', 'documents']
 
 const getProjects = async (req, res) => {
   try {
@@ -270,7 +225,7 @@ const createProject = async (req, res) => {
 
 const updateProject = async (req, res) => {
   try {
-    const payload = flattenNestedGroupsForUpdate(normalizeProjectPayload(req.body, req.files))
+    const payload = flattenNestedGroupsForUpdate(normalizeProjectPayload(req.body, req.files), NESTED_GROUP_KEYS)
     const project = await Project.findOneAndUpdate({ _id: req.params.id, builderId: req.builderId }, payload, {
       new: true,
       runValidators: true,
