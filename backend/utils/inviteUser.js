@@ -11,10 +11,12 @@ const { sendMail } = require('./email');
 // wins when explicitly set (e.g. pinning to a canonical domain in production
 // behind a proxy where Origin may not be trustworthy); localhost:5173 is only
 // the last-resort fallback for non-browser callers (scripts, tests).
-const buildLoginLink = (origin) => {
+const buildFrontendLink = (origin, path = '/login') => {
   const frontend = process.env.FRONTEND_URL || origin || 'http://localhost:5173';
-  return `${frontend.replace(/\/$/, '')}/login`;
+  return `${frontend.replace(/\/$/, '')}${path}`;
 };
+
+const buildLoginLink = (origin) => buildFrontendLink(origin, '/login');
 
 // `joiningExistingAccount` = the invited email already has a fully onboarded
 // PropVault account (they're being added to a second builder), so there's no
@@ -145,6 +147,7 @@ const createInvitedUser = async ({ name, email, role, builderId, invitedBy, chan
 
 module.exports = {
   createInvitedUser,
+  buildFrontendLink,
   buildLoginLink,
   sendInviteMail,
   sendBuilderInviteMail,

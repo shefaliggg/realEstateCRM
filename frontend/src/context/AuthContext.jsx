@@ -49,6 +49,16 @@ export function AuthProvider({ children }) {
     return data
   }, [storeSession])
 
+  const forgotPassword = useCallback(async (email) => {
+    const { data } = await api.post('/auth/forgot-password', { email })
+    return data
+  }, [])
+
+  const resetPassword = useCallback(async (token, newPassword) => {
+    const { data } = await api.post('/auth/reset-password', { token, newPassword })
+    return data
+  }, [])
+
   const selectBuilder = useCallback(async (builderId) => {
     const { data } = await api.post('/auth/select-builder', { builderId })
     storeSession(data)
@@ -115,6 +125,8 @@ export function AuthProvider({ children }) {
         user,
         login,
         setPassword,
+        forgotPassword,
+        resetPassword,
         selectBuilder,
         getMyMemberships,
         refreshUser,

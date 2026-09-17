@@ -7,12 +7,16 @@ const {
 	getMe,
 	seedAdmin,
 	setPassword,
+	forgotPassword,
+	resetPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 const { attachTenantScope } = require('../middleware/tenantMiddleware');
 
 router.post('/login', login);
 router.post('/set-password', setPassword);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.post('/select-builder', protect, selectBuilder);
 router.get('/memberships', protect, listMyMemberships);
 router.get('/me', protect, attachTenantScope, getMe);

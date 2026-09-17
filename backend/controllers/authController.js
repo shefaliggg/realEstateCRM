@@ -7,16 +7,30 @@ const { isStrongPassword } = require('../utils/security');
 const { recordAudit } = require('../utils/auditLog');
 const { sanitizeUser } = require('../utils/sanitizeUser');
 const { resolveEffectivePermissions } = require('../utils/roleService');
+const { getRequestOrigin } = require('../utils/requestOrigin');
+const { buildFrontendLink } = require('../utils/inviteUser');
+const { sendMail } = require('../utils/email');
 
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 const PRE_SELECT_TOKEN_EXPIRES_IN = '10m';
 const PASSWORD_RESET_TOKEN_EXPIRES_IN = '15m';
+const FORGOT_PASSWORD_TOKEN_EXPIRES_IN = '15m';
 
 const generateToken = (id, role, builderId, membershipId, expiresIn = JWT_EXPIRES_IN) =>
   jwt.sign({ id, role, builderId, membershipId }, process.env.JWT_SECRET, { expiresIn });
 
 const generatePasswordResetToken = (id) =>
   jwt.sign({ id, purpose: 'password-reset' }, process.env.JWT_SECRET, { expiresIn: PASSWORD_RESET_TOKEN_EXPIRES_IN });
+
+// `v` pins the token to the account's current passwordResetTokenVersion (see
+// User model) so it stops working the moment it's redeemed or the password
+// changes any other way — unlike generatePasswordResetToken above, nothing
+// else invalidates this one, so the version check is the only thing standing
+// between a leaked link and a replay.
+const generateForgotPasswordToken = (id, tokenVersion) =>
+  jwt.sign({ id, purpose: 'forgot-password', v: tokenVersion }, process.env.JWT_SECRET, {
+    expiresIn: FORGOT_PASSWORD_TOKEN_EXPIRES_IN,
+  });
 
 // Shared by login() and setPassword() — both end with "figure out this
 // account's session and hand back a token". Platform staff get a token
@@ -330,6 +344,101 @@ const setPassword = async (req, res) => {
   }
 };
 
+// @desc  Request a password reset link by email. Always responds with the
+//        same generic message whether or not the email matches an account
+//        (and whether or not it's active), so the endpoint can't be used to
+//        probe which emails have PropVault accounts.
+// @route POST /api/auth/forgot-password
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Please provide your email address' });
+    }
+
+    const genericResponse = {
+      message: "If an account exists for that email, we've sent password reset instructions.",
+    };
+
+    const user = await User.findOne({ email: String(email).toLowerCase().trim() }).select('+password');
+    if (!user || !user.isActive || !user.password) {
+      return res.json(genericResponse);
+    }
+
+    const token = generateForgotPasswordToken(user._id, user.passwordResetTokenVersion || 0);
+    const resetLink = buildFrontendLink(getRequestOrigin(req), `/reset-password?token=${token}`);
+
+    await sendMail({
+      to: user.email,
+      subject: 'Reset your PropVault password',
+      text: [
+        `Hello ${user.name},`,
+        '',
+        'We received a request to reset your PropVault password.',
+        `Reset it here: ${resetLink}`,
+        '',
+        "This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.",
+      ].join('\n'),
+    });
+
+    res.json(genericResponse);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Complete a forgot-password reset using the emailed token.
+// @route POST /api/auth/reset-password
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) {
+      return res.status(400).json({ message: 'Reset token and new password are required' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ message: 'This reset link has expired. Please request a new one.' });
+    }
+    if (decoded.purpose !== 'forgot-password') {
+      return res.status(400).json({ message: 'Invalid reset token' });
+    }
+
+    if (!isStrongPassword(newPassword)) {
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters and include uppercase, lowercase, number and special character.',
+      });
+    }
+
+    const user = await User.findById(decoded.id).select('+password');
+    if (!user || !user.isActive) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    if ((user.passwordResetTokenVersion || 0) !== decoded.v) {
+      return res.status(401).json({ message: 'This reset link has already been used. Please request a new one.' });
+    }
+
+    user.password = newPassword;
+    user.mustChangePassword = false;
+    await user.save();
+
+    recordAudit({
+      actor: user._id,
+      action: 'password-reset',
+      targetType: 'User',
+      targetId: user._id,
+      metadata: { ip: req.ip, userAgent: req.headers['user-agent'] },
+    });
+
+    res.json({ message: 'Password reset successfully. You can now sign in.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   login,
   selectBuilder,
@@ -337,6 +446,8 @@ module.exports = {
   getMe,
   seedAdmin,
   setPassword,
+  forgotPassword,
+  resetPassword,
   sanitizeUser,
   generateToken,
 };

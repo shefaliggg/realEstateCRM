@@ -76,6 +76,14 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
+    // Bumped every time the password changes (invite temp password, admin
+    // reset, self-service forgot-password) so any forgot-password JWT issued
+    // against an earlier value is rejected — the token embeds the version it
+    // was issued for, see authController's forgotPassword/resetPassword.
+    passwordResetTokenVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
@@ -85,6 +93,7 @@ userSchema.pre('save', async function (next) {
   if (!this.password || !this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  this.passwordResetTokenVersion = (this.passwordResetTokenVersion || 0) + 1;
   next();
 });
 
