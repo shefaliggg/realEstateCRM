@@ -1,5 +1,9 @@
 const Unit = require('../models/Unit')
 const Project = require('../models/Project')
+const Customer = require('../models/Customer')
+const Lead = require('../models/Lead')
+const { findExistingCustomer } = require('../utils/customerLookup')
+const Booking = require('../models/Booking')
 
 const uploadedFileUrl = (bucket) =>
   bucket && bucket[0] ? `/uploads/project-images/${bucket[0].filename}` : undefined
@@ -39,7 +43,10 @@ const getUnits = async (req, res) => {
     if (req.query.block) filter.block = req.query.block
     if (req.query.status) filter.status = req.query.status
     if (req.query.bhkType) filter.bhkType = req.query.bhkType
-    const units = await Unit.find(filter).sort({ block: 1, floor: 1, unitNo: 1 })
+    const units = await Unit.find(filter)
+      .populate('currentCustomer', 'name phone email')
+      .populate('currentLead', 'name source')
+      .sort({ block: 1, floor: 1, unitNo: 1 })
     res.json(units)
   } catch (err) {
     res.status(500).json({ message: err.message })
@@ -79,6 +86,99 @@ const updateUnit = async (req, res) => {
     const payload = normalizeUnitBody(req.body, req.files || {})
     const unit = await Unit.findOne({ _id: req.params.id, builderId: req.builderId })
     if (!unit) return res.status(404).json({ message: 'Unit not found' })
+    const { customerId, customerName, customerPhone, customerEmail, leadId, statusNote } = payload
+    ;['customerId', 'customerName', 'customerPhone', 'customerEmail', 'leadId', 'statusNote'].forEach((k) => delete payload[k])
+
+    const newStatus = payload.status
+    const statusChanging = newStatus && newStatus !== unit.status
+    const needsCustomer = newStatus === 'Reserved' || newStatus === 'Booked'
+
+    if (needsCustomer && (statusChanging || customerId || customerName || leadId)) {
+      let customer = null
+      let lead = null
+      if (customerId) {
+        customer = await Customer.findOne({ _id: customerId, builderId: req.builderId })
+        if (!customer) return res.status(404).json({ message: 'Customer not found' })
+      } else if (leadId) {
+        lead = await Lead.findOne({ _id: leadId, builderId: req.builderId })
+        if (!lead) return res.status(404).json({ message: 'Lead not found' })
+        customer = lead.customer ? await Customer.findOne({ _id: lead.customer, builderId: req.builderId }) : null
+        if (!customer) customer = await findExistingCustomer(req.builderId, lead)
+        if (!customer) {
+          customer = await Customer.create({
+            builderId: req.builderId,
+            name: lead.name,
+            phone: lead.phone,
+            email: lead.email,
+            project: unit.project,
+            unit: unit._id,
+            lead: lead._id,
+            createdBy: req.user._id,
+          })
+        }
+      } else if (customerName && customerPhone) {
+        const existing = await findExistingCustomer(req.builderId, { phone: customerPhone, email: customerEmail })
+        if (existing) {
+          return res.status(409).json({
+            message: `A customer with this phone/email already exists: ${existing.name} (${existing.phone})`,
+            customer: existing,
+          })
+        }
+        {
+          const matchingLead = await Lead.findOne({ builderId: req.builderId, phone: customerPhone.trim(), customer: null })
+          customer = await Customer.create({
+            builderId: req.builderId,
+            name: customerName,
+            phone: customerPhone,
+            email: customerEmail || undefined,
+            project: unit.project,
+            unit: unit._id,
+            lead: matchingLead?._id || null,
+            createdBy: req.user._id,
+          })
+          lead = matchingLead
+        }
+      } else if (!unit.currentCustomer) {
+        return res.status(400).json({ message: `Customer details are required to mark a unit ${newStatus}` })
+      }
+      if (customer) {
+        if (!customer.unit || String(customer.unit) !== String(unit._id)) {
+          customer.unit = unit._id
+          await customer.save()
+        }
+        unit.currentCustomer = customer._id
+        const linkedLead = lead || (customer.lead ? await Lead.findOne({ _id: customer.lead, builderId: req.builderId }) : null)
+        if (linkedLead) {
+          unit.currentLead = linkedLead._id
+          if (String(linkedLead.customer) !== String(customer._id)) {
+            linkedLead.customer = customer._id
+            await linkedLead.save()
+          }
+        }
+      }
+      if (newStatus === 'Booked') {
+        const existing = await Booking.findOne({ unit: unit._id, builderId: req.builderId, status: 'Active' })
+        if (!existing) {
+          await Booking.create({
+            builderId: req.builderId,
+            project: unit.project,
+            unit: unit._id,
+            customer: unit.currentCustomer,
+            totalAmount: unit.totalPrice || unit.basePrice || 0,
+            bookedBy: req.user._id,
+            createdBy: req.user._id,
+          })
+        }
+      }
+    } else if (statusChanging && (newStatus === 'Available' || newStatus === 'Cancelled')) {
+      unit.currentCustomer = null
+      unit.currentLead = null
+      await Booking.updateMany({ unit: unit._id, builderId: req.builderId, status: 'Active' }, { status: 'Cancelled' })
+    }
+
+    if (statusChanging) {
+      unit.statusHistory.push({ status: newStatus, changedBy: req.user._id, note: statusNote || undefined })
+    }
     Object.entries(payload).forEach(([key, value]) => {
       if (key === 'documents') unit.documents = { ...(unit.documents?.toObject?.() || unit.documents || {}), ...value }
       else unit[key] = value
@@ -132,9 +232,19 @@ const bulkCreateUnits = async (req, res) => {
   }
 }
 
+const applyPriceMethod = (unit, priceMethod, priceValue) => {
+  const value = Number(priceValue)
+  if (!priceMethod || Number.isNaN(value)) return
+  const currentBase = Number(unit.basePrice) || 0
+  if (priceMethod === 'perSqft') unit.basePrice = value * (Number(unit.carpetArea) || 0)
+  else if (priceMethod === 'increasePct') unit.basePrice = currentBase * (1 + value / 100)
+  else if (priceMethod === 'decreasePct') unit.basePrice = currentBase * (1 - value / 100)
+  else if (priceMethod === 'increaseAmt') unit.basePrice = currentBase + value
+}
+
 const bulkUpdateUnits = async (req, res) => {
   try {
-    const { unitIds, status, note, ...priceFields } = req.body
+    const { unitIds, status, note, priceMethod, priceValue, ...priceFields } = req.body
     if (!Array.isArray(unitIds) || unitIds.length === 0) {
       return res.status(400).json({ message: 'unitIds is required' })
     }
@@ -153,6 +263,7 @@ const bulkUpdateUnits = async (req, res) => {
             unit[key] = Number(priceFields[key])
           }
         })
+        applyPriceMethod(unit, priceMethod, priceValue)
         await unit.save()
       })
     )

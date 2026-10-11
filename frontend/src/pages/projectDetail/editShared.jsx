@@ -55,6 +55,22 @@ export function Modal({ title, icon, onClose, children, wide }) {
   )
 }
 
+// Slide-over panel from the right edge, for browsing/quick-actions rather than a form submission.
+export function Drawer({ title, icon, onClose, children, footer }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex justify-end" onClick={onClose}>
+      <div className="bg-white shadow-xl w-full max-w-md h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="font-semibold text-gray-900">{icon} {title}</h2>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none px-1">×</button>
+        </div>
+        <div className="px-5 py-4 overflow-y-auto flex-1">{children}</div>
+        {footer && <div className="flex gap-2 px-5 py-4 border-t border-gray-100 shrink-0">{footer}</div>}
+      </div>
+    </div>
+  )
+}
+
 export function EditModal({ title, icon, onClose, onSubmit, saving, error, children, submitLabel = 'Save Changes', wide }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>

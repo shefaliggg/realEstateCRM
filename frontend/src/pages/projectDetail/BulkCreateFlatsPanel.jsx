@@ -11,8 +11,9 @@ const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3
 
 const inputCls = 'text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white'
 
-export default function BulkCreateFlatsPanel({ id, towers, onCreated, embedded = false }) {
-  const [open, setOpen] = useState(embedded)
+// Always used inside a Modal (BlockPage.jsx, InventoryTab.jsx) — this is the modal's content, not a standalone card.
+export default function BulkCreateFlatsPanel({ id, towers, onCreated }) {
+  const [step, setStep] = useState('config')
   const [tower, setTower] = useState(towers[0] || '')
   const [startFloor, setStartFloor] = useState('1')
   const [endFloor, setEndFloor] = useState('1')
@@ -67,100 +68,119 @@ export default function BulkCreateFlatsPanel({ id, towers, onCreated, embedded =
     return null
   }
 
-  const form = (
-    <div className={embedded ? 'space-y-4' : 'mt-4 space-y-4'}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Tower</label>
-              <select value={tower} onChange={(e) => setTower(e.target.value)} className={`${inputCls} w-full`}>
-                {towers.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Starting Floor</label>
-              <input type="number" value={startFloor} onChange={(e) => setStartFloor(e.target.value)} className={`${inputCls} w-full`} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Ending Floor</label>
-              <input type="number" value={endFloor} onChange={(e) => setEndFloor(e.target.value)} className={`${inputCls} w-full`} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Units Per Floor</label>
-              <input type="number" value={unitsPerFloor} onChange={(e) => setUnitsPerFloor(e.target.value)} className={`${inputCls} w-full`} />
-            </div>
+  if (step === 'preview') {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+          <p className="text-xs font-semibold text-gray-600 mb-2">
+            {generated.length} unit{generated.length !== 1 ? 's' : ''} will be created — Tower {tower}, floors {startFloor}–{endFloor}, {unitsPerFloor}/floor, {bhkType}
+          </p>
+          <div className="max-h-64 overflow-y-auto flex flex-wrap gap-1.5">
+            {generated.map((u) => (
+              <span key={u.unitNo} className="text-[11px] font-medium px-2 py-1 rounded bg-white border border-gray-200 text-gray-700">{u.unitNo}</span>
+            ))}
           </div>
+        </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Flat Number Format</label>
-            <div className="flex flex-wrap gap-2">
-              {FORMATS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  onClick={() => setFormat(f.key)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
-                    format === f.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
-                  }`}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        {message && <div className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">{message}</div>}
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Default BHK Type</label>
-              <select value={bhkType} onChange={(e) => setBhkType(e.target.value)} className={`${inputCls} w-full`}>
-                {BHK_TYPES.map((b) => <option key={b}>{b}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Default Carpet Area (sqft)</label>
-              <input type="number" value={carpetArea} onChange={(e) => setCarpetArea(e.target.value)} className={`${inputCls} w-full`} placeholder="Optional" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1">Default Base Price (₹)</label>
-              <input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className={`${inputCls} w-full`} placeholder="Optional" />
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
-            <p className="text-xs font-semibold text-gray-600 mb-2">Preview ({generated.length} unit{generated.length !== 1 ? 's' : ''} will be created)</p>
-            {generated.length === 0 ? (
-              <p className="text-xs text-gray-400">Fill in tower, floor range, and units per floor to preview.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {generated.slice(0, 12).map((u) => (
-                  <span key={u.unitNo} className="text-[11px] font-medium px-2 py-1 rounded bg-white border border-gray-200 text-gray-700">{u.unitNo}</span>
-                ))}
-                {generated.length > 12 && <span className="text-[11px] text-gray-400 self-center">+{generated.length - 12} more</span>}
-              </div>
-            )}
-          </div>
-
-          {message && <div className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">{message}</div>}
-
+        <div className="flex gap-2">
           <button
             type="button"
             disabled={generated.length === 0 || busy}
             onClick={submit}
             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
           >
-            {busy ? 'Generating...' : `Generate ${generated.length} Unit${generated.length !== 1 ? 's' : ''}`}
+            {busy ? 'Creating...' : `Create ${generated.length} Unit${generated.length !== 1 ? 's' : ''}`}
           </button>
-    </div>
-  )
-
-  if (embedded) return form
+          <button type="button" onClick={() => setStep('config')} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            ← Back
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full flex items-center justify-between text-left">
-        <h3 className="font-semibold text-gray-800">⭐ Bulk Create Flats</h3>
-        <span className="text-xs text-primary-600 font-medium">{open ? 'Hide' : 'Open'}</span>
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Tower</label>
+          <select value={tower} onChange={(e) => setTower(e.target.value)} className={`${inputCls} w-full`}>
+            {towers.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Starting Floor</label>
+          <input type="number" value={startFloor} onChange={(e) => setStartFloor(e.target.value)} className={`${inputCls} w-full`} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Ending Floor</label>
+          <input type="number" value={endFloor} onChange={(e) => setEndFloor(e.target.value)} className={`${inputCls} w-full`} />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Units Per Floor</label>
+          <input type="number" value={unitsPerFloor} onChange={(e) => setUnitsPerFloor(e.target.value)} className={`${inputCls} w-full`} />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Flat Number Format</label>
+        <div className="flex flex-wrap gap-2">
+          {FORMATS.map((f) => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => setFormat(f.key)}
+              className={`text-xs px-3 py-1.5 rounded-lg border font-medium transition ${
+                format === f.key ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Default BHK Type</label>
+          <select value={bhkType} onChange={(e) => setBhkType(e.target.value)} className={`${inputCls} w-full`}>
+            {BHK_TYPES.map((b) => <option key={b}>{b}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Default Carpet Area (sqft)</label>
+          <input type="number" value={carpetArea} onChange={(e) => setCarpetArea(e.target.value)} className={`${inputCls} w-full`} placeholder="Optional" />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Default Base Price (₹)</label>
+          <input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} className={`${inputCls} w-full`} placeholder="Optional" />
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+        <p className="text-xs font-semibold text-gray-600 mb-2">Preview ({generated.length} unit{generated.length !== 1 ? 's' : ''} will be created)</p>
+        {generated.length === 0 ? (
+          <p className="text-xs text-gray-400">Fill in tower, floor range, and units per floor to preview.</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {generated.slice(0, 12).map((u) => (
+              <span key={u.unitNo} className="text-[11px] font-medium px-2 py-1 rounded bg-white border border-gray-200 text-gray-700">{u.unitNo}</span>
+            ))}
+            {generated.length > 12 && <span className="text-[11px] text-gray-400 self-center">+{generated.length - 12} more</span>}
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        disabled={generated.length === 0}
+        onClick={() => setStep('preview')}
+        className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+      >
+        Preview {generated.length} Unit{generated.length !== 1 ? 's' : ''} →
       </button>
-      {open && form}
     </div>
   )
 }

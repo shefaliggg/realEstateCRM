@@ -3,6 +3,7 @@ const Booking = require('../models/Booking')
 const { createInvitedUser } = require('../utils/inviteUser')
 const { recordAudit } = require('../utils/auditLog')
 const { getRequestOrigin } = require('../utils/requestOrigin')
+const { findExistingCustomer } = require('../utils/customerLookup')
 
 const getCustomers = async (req, res) => {
   try {
@@ -48,6 +49,13 @@ const getCustomerById = async (req, res) => {
 
 const createCustomer = async (req, res) => {
   try {
+    const existing = await findExistingCustomer(req.builderId, req.body)
+    if (existing) {
+      return res.status(409).json({
+        message: `A customer with this phone/email already exists: ${existing.name} (${existing.phone})`,
+        customer: existing,
+      })
+    }
     const customer = new Customer({ ...req.body, builderId: req.builderId, createdBy: req.user._id })
     await customer.save()
     res.status(201).json(customer)

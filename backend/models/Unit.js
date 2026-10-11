@@ -53,6 +53,7 @@ const unitSchema = new mongoose.Schema(
     },
     currentLead: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', default: null },
     currentDeal: { type: mongoose.Schema.Types.ObjectId, ref: 'Deal', default: null },
+    currentCustomer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     statusHistory: [statusHistorySchema],
   },
   { timestamps: true }

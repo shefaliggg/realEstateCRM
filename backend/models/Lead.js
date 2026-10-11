@@ -57,6 +57,7 @@ const leadSchema = new mongoose.Schema(
     lastContactDate: Date,
     notes: [noteSchema],
     followUpTasks: [followUpTaskSchema],
+    customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', default: null },
     isActive: { type: Boolean, default: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },

@@ -181,7 +181,6 @@ export default function BlockPage() {
             id={projectId}
             towers={[block]}
             onCreated={() => { refetchUnits(); setShowBulkAdd(false) }}
-            embedded
           />
         </Modal>
       )}
