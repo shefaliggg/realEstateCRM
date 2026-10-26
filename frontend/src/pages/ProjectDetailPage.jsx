@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import api from '../api/axios'
-import { formatPrice, formatDate, getInitials } from './projectDetail/shared'
+import { formatPrice, formatDate, getInitials, flattenMembership } from './projectDetail/shared'
 import { EditPencilButton, HoverPhotoEdit } from './projectDetail/editShared'
 import { EditCoverPhotoModal, EditLogoModal, EditHeaderInfoModal, EditSalesStatusModal } from './projectDetail/headerEditModals'
 import OverviewTab from './projectDetail/OverviewTab'
@@ -14,10 +14,9 @@ import ActivityTab from './projectDetail/ActivityTab'
 import TeamTab from './projectDetail/TeamTab'
 import SettingsTab from './projectDetail/SettingsTab'
 
-const TABS = [
+const BASE_TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'profile', label: 'Profile' },
-  { key: 'towers', label: 'Towers' },
   { key: 'inventory', label: 'Inventory' },
   { key: 'documents', label: 'Documents' },
   { key: 'gallery', label: 'Gallery' },
@@ -25,6 +24,8 @@ const TABS = [
   { key: 'team', label: 'Team' },
   { key: 'settings', label: 'Settings' },
 ]
+
+const TOWER_TAB = { key: 'towers', label: 'Towers' }
 
 export default function ProjectDetailPage() {
   const { id } = useParams()
@@ -40,8 +41,16 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState('overview')
   const [headerModal, setHeaderModal] = useState(null)
+  const isVillaProject = project?.type === 'Villas'
 
   const handleProjectChanged = useCallback((p) => setProject((prev) => ({ ...prev, ...p })), [])
+  const handleUserAdded = useCallback((u) => setUsers((prev) => (prev.some((x) => x._id === u._id) ? prev : [u, ...prev])), [])
+
+  useEffect(() => {
+    if (isVillaProject && tab === 'towers') {
+      setTab('overview')
+    }
+  }, [isVillaProject, tab])
 
   const refetchUnits = useCallback(() => {
     api.get(`/projects/${id}/units`).then((res) => setUnits(res.data)).catch(() => {})
@@ -67,7 +76,7 @@ export default function ProjectDetailPage() {
         setDeals(dRes.data)
         setBookings(bRes.data)
         setPayments(payRes.data)
-        setUsers(usersRes.data || [])
+        setUsers((usersRes.data || []).map(flattenMembership).filter(Boolean))
       })
       .catch(() => setError('Failed to load project'))
       .finally(() => setLoading(false))
@@ -82,6 +91,7 @@ export default function ProjectDetailPage() {
   if (!project) return null
 
   const userById = new Map(users.map((u) => [u._id, u]))
+  const tabs = isVillaProject ? BASE_TABS : [...BASE_TABS.slice(0, 2), TOWER_TAB, ...BASE_TABS.slice(2)]
 
   const locationParts = [
     project.location?.address, project.location?.landmark, project.location?.locality, project.location?.city,
@@ -164,13 +174,15 @@ export default function ProjectDetailPage() {
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">Price</p>
                 <p className="font-bold text-gray-900">{priceLabel}</p>
-                <p className="text-[10px] text-gray-400">Set per tower</p>
+                <p className="text-[10px] text-gray-400">{isVillaProject ? 'Set per villa' : 'Set per tower'}</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏠 Add Unit</Link>
-              <Link to={`/projects/${id}/towers/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏢 Add Tower</Link>
+              <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">{isVillaProject ? '🏡 Add Villa' : '🏠 Add Unit'}</Link>
+              {!isVillaProject && (
+                <Link to={`/projects/${id}/towers/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏢 Add Tower</Link>
+              )}
               <Link to={`/leads/add?project=${id}`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">👤 Add Lead</Link>
               {project.documents?.brochure && (
                 <a href={project.documents.brochure} target="_blank" rel="noreferrer" className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">⭳ Brochure</a>
@@ -189,7 +201,7 @@ export default function ProjectDetailPage() {
       <div>
         {/* Tabs */}
         <div className="flex flex-wrap border-b border-gray-200 mb-5">
-          {TABS.map(({ key, label }) => (
+          {tabs.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -220,7 +232,7 @@ export default function ProjectDetailPage() {
         {tab === 'gallery' && <GalleryTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
         {tab === 'activity' && <ActivityTab units={units} bookings={bookings} payments={payments} userById={userById} />}
         {tab === 'team' && (
-          <TeamTab id={id} project={project} users={users} onProjectChanged={handleProjectChanged} />
+          <TeamTab id={id} project={project} users={users} onProjectChanged={handleProjectChanged} onUserAdded={handleUserAdded} />
         )}
         {tab === 'settings' && <SettingsTab id={id} project={project} />}
       </div>

@@ -3,16 +3,20 @@ import { EditModal, Field, inputCls, selectCls, useEntitySave, buildFormData, Si
 
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
+const VILLA_STYLES = ['Independent Villa', 'Duplex Villa', 'Row Villa', 'Twin Villa']
 const STATUS_OPTIONS = ['Available', 'Reserved', 'Booked', 'Registered', 'Cancelled']
 
 const PRICE_KEYS = ['basePrice', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges']
 
-export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSaved }) {
+export function EditUnitModal({ projectId, unit, bhkTypeOptions, isVillaProject = false, onClose, onSaved }) {
   const { save, saving, error } = useEntitySave(`/projects/${projectId}/units/${unit._id}`, onSaved)
   const [form, setForm] = useState({
     floor: unit.floor ?? '', unitNo: unit.unitNo || '',
     bhkType: unit.bhkType || '2 BHK', facing: unit.facing || '', cornerUnit: !!unit.cornerUnit,
     carpetArea: unit.carpetArea ?? '', builtUpArea: unit.builtUpArea ?? '', superBuiltUpArea: unit.superBuiltUpArea ?? '', balconyArea: unit.balconyArea ?? '',
+    plotArea: unit.plotArea ?? '', gardenArea: unit.gardenArea ?? '', terraceArea: unit.terraceArea ?? '',
+    bathrooms: unit.bathrooms ?? '', villaFloors: unit.villaFloors ?? '', parkingSpaces: unit.parkingSpaces ?? '',
+    villaStyle: unit.villaStyle || 'Independent Villa', privateGarden: !!unit.privateGarden,
     basePrice: unit.basePrice ?? '', pricePerSqft: unit.pricePerSqft ?? '', plc: unit.plc ?? '', floorRise: unit.floorRise ?? '',
     parkingCharges: unit.parkingCharges ?? '', clubCharges: unit.clubCharges ?? '', otherCharges: unit.otherCharges ?? '',
     parkingIncluded: !!unit.parkingIncluded, parkingNumber: unit.parkingNumber || '',
@@ -22,8 +26,9 @@ export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSave
   const [priceSheetFile, setPriceSheetFile] = useState(null)
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const totalPricePreview = PRICE_KEYS.some((k) => form[k])
-    ? PRICE_KEYS.reduce((sum, k) => sum + (Number(form[k]) || 0), 0)
+  const priceKeys = isVillaProject ? PRICE_KEYS.filter((key) => key !== 'floorRise') : PRICE_KEYS
+  const totalPricePreview = priceKeys.some((k) => form[k])
+    ? priceKeys.reduce((sum, k) => sum + (Number(form[k]) || 0), 0)
     : null
 
   const handleSubmit = async (e) => {
@@ -31,6 +36,11 @@ export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSave
     const fields = {
       floor: form.floor, unitNo: form.unitNo, bhkType: form.bhkType, facing: form.facing, cornerUnit: String(form.cornerUnit),
       carpetArea: form.carpetArea, builtUpArea: form.builtUpArea, superBuiltUpArea: form.superBuiltUpArea, balconyArea: form.balconyArea,
+      ...(isVillaProject ? {
+        plotArea: form.plotArea, gardenArea: form.gardenArea, terraceArea: form.terraceArea,
+        bathrooms: form.bathrooms, villaFloors: form.villaFloors, parkingSpaces: form.parkingSpaces,
+        villaStyle: form.villaStyle, privateGarden: String(form.privateGarden),
+      } : {}),
       basePrice: form.basePrice, pricePerSqft: form.pricePerSqft, plc: form.plc, floorRise: form.floorRise,
       parkingCharges: form.parkingCharges, clubCharges: form.clubCharges, otherCharges: form.otherCharges,
       parkingIncluded: String(form.parkingIncluded), parkingNumber: form.parkingNumber,
@@ -43,11 +53,11 @@ export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSave
   }
 
   return (
-    <EditModal title={`Flat ${unit.unitNo}`} icon="🏠" onClose={onClose} onSubmit={handleSubmit} saving={saving} error={error} wide submitLabel="Save Flat">
+    <EditModal title={isVillaProject ? `Villa ${unit.unitNo}` : `Flat ${unit.unitNo}`} icon="🏠" onClose={onClose} onSubmit={handleSubmit} saving={saving} error={error} wide submitLabel={isVillaProject ? 'Save Villa' : 'Save Flat'}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Floor"><input type="number" value={form.floor} onChange={set('floor')} className={inputCls} /></Field>
-        <Field label="Flat Number"><input value={form.unitNo} onChange={set('unitNo')} className={inputCls} /></Field>
-        <Field label="Unit Type">
+        {!isVillaProject && <Field label="Floor"><input type="number" value={form.floor} onChange={set('floor')} className={inputCls} /></Field>}
+        <Field label={isVillaProject ? 'Villa Number' : 'Flat Number'}><input value={form.unitNo} onChange={set('unitNo')} className={inputCls} /></Field>
+        <Field label={isVillaProject ? 'Villa BHK Type' : 'Unit Type'}>
           <select value={form.bhkType} onChange={set('bhkType')} className={selectCls}>
             {(bhkTypeOptions?.length ? bhkTypeOptions : BHK_TYPES).map((b) => <option key={b} value={b}>{b}</option>)}
           </select>
@@ -59,23 +69,45 @@ export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSave
           </select>
         </Field>
       </div>
-      <label className="flex items-center gap-2 cursor-pointer">
+      {!isVillaProject && <label className="flex items-center gap-2 cursor-pointer">
         <input type="checkbox" checked={form.cornerUnit} onChange={(e) => setForm((f) => ({ ...f, cornerUnit: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
         <span className="text-sm text-gray-600">This is a corner unit</span>
-      </label>
+      </label>}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {isVillaProject ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field label="Villa Style">
+              <select value={form.villaStyle} onChange={set('villaStyle')} className={selectCls}>
+                {VILLA_STYLES.map((style) => <option key={style}>{style}</option>)}
+              </select>
+            </Field>
+            <Field label="Bathrooms"><input type="number" min="0" value={form.bathrooms} onChange={set('bathrooms')} className={inputCls} /></Field>
+            <Field label="Villa Floors"><input type="number" min="1" value={form.villaFloors} onChange={set('villaFloors')} className={inputCls} /></Field>
+            <Field label="Plot Area (sqft)"><input type="number" min="0" value={form.plotArea} onChange={set('plotArea')} className={inputCls} /></Field>
+            <Field label="Built-up Area (sqft)"><input type="number" min="0" value={form.builtUpArea} onChange={set('builtUpArea')} className={inputCls} /></Field>
+            <Field label="Carpet Area (sqft)"><input type="number" min="0" value={form.carpetArea} onChange={set('carpetArea')} className={inputCls} /></Field>
+            <Field label="Garden Area (sqft)"><input type="number" min="0" value={form.gardenArea} onChange={set('gardenArea')} className={inputCls} /></Field>
+            <Field label="Terrace Area (sqft)"><input type="number" min="0" value={form.terraceArea} onChange={set('terraceArea')} className={inputCls} /></Field>
+            <Field label="Parking Spaces"><input type="number" min="0" value={form.parkingSpaces} onChange={set('parkingSpaces')} className={inputCls} /></Field>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.privateGarden} onChange={(e) => setForm((f) => ({ ...f, privateGarden: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
+            <span className="text-sm text-gray-600">Private garden included</span>
+          </label>
+        </>
+      ) : <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label="Carpet Area (sqft)"><input type="number" value={form.carpetArea} onChange={set('carpetArea')} className={inputCls} /></Field>
         <Field label="Built-up Area (sqft)"><input type="number" value={form.builtUpArea} onChange={set('builtUpArea')} className={inputCls} /></Field>
         <Field label="Super Built-up (sqft)"><input type="number" value={form.superBuiltUpArea} onChange={set('superBuiltUpArea')} className={inputCls} /></Field>
         <Field label="Balcony Area (sqft)"><input type="number" value={form.balconyArea} onChange={set('balconyArea')} className={inputCls} /></Field>
-      </div>
+      </div>}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Field label="Base Price (₹)"><input type="number" value={form.basePrice} onChange={set('basePrice')} className={inputCls} /></Field>
         <Field label="Price / Sq.ft (₹)"><input type="number" value={form.pricePerSqft} onChange={set('pricePerSqft')} className={inputCls} /></Field>
         <Field label="PLC (₹)"><input type="number" value={form.plc} onChange={set('plc')} className={inputCls} /></Field>
-        <Field label="Floor Rise (₹)"><input type="number" value={form.floorRise} onChange={set('floorRise')} className={inputCls} /></Field>
+        {!isVillaProject && <Field label="Floor Rise (₹)"><input type="number" value={form.floorRise} onChange={set('floorRise')} className={inputCls} /></Field>}
         <Field label="Parking Charges (₹)"><input type="number" value={form.parkingCharges} onChange={set('parkingCharges')} className={inputCls} /></Field>
         <Field label="Club Charges (₹)"><input type="number" value={form.clubCharges} onChange={set('clubCharges')} className={inputCls} /></Field>
         <Field label="Other Charges (₹)"><input type="number" value={form.otherCharges} onChange={set('otherCharges')} className={inputCls} /></Field>
@@ -90,9 +122,9 @@ export function EditUnitModal({ projectId, unit, bhkTypeOptions, onClose, onSave
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={form.parkingIncluded} onChange={(e) => setForm((f) => ({ ...f, parkingIncluded: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
-          <span className="text-sm text-gray-600">Parking included with this unit</span>
+          <span className="text-sm text-gray-600">Parking included with this {isVillaProject ? 'villa' : 'unit'}</span>
         </label>
-        <Field label="Parking Number"><input value={form.parkingNumber} onChange={set('parkingNumber')} className={inputCls} placeholder="P-104" /></Field>
+        {!isVillaProject && <Field label="Parking Number"><input value={form.parkingNumber} onChange={set('parkingNumber')} className={inputCls} placeholder="P-104" /></Field>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

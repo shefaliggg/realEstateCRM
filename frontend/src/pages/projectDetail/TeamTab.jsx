@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../../api/axios'
-import { getInitials } from './shared'
+import { getInitials, flattenMembership } from './shared'
 
 const KNOWN_DESIGNATIONS = [
   'Project Manager', 'Sales Manager', 'Sales Executive', 'Site Engineer', 'Site Supervisor',
   'CRM Manager', 'CRM Executive', 'Marketing Manager', 'Accounts / Finance', 'Legal Advisor',
 ]
 const DESIGNATIONS = [...KNOWN_DESIGNATIONS, 'Other']
+const INVITE_ROLES = [
+  'sales_manager', 'sales_executive', 'crm_manager', 'crm_executive', 'marketing_manager', 'marketing_executive', 'builder_admin',
+]
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMPTY_INVITE = { email: '', name: '', role: 'sales_executive' }
 
-export default function TeamTab({ id, project, users, onProjectChanged }) {
+export default function TeamTab({ id, project, users, onProjectChanged, onUserAdded }) {
   const assignedUsers = Array.isArray(project?.managedBy) ? project.managedBy : []
   const existingDesignations = Array.isArray(project?.teamDesignations) ? project.teamDesignations : []
 
@@ -27,6 +32,10 @@ export default function TeamTab({ id, project, users, onProjectChanged }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [managerSearch, setManagerSearch] = useState('')
   const dropdownRef = useRef(null)
+  const [emailFormOpen, setEmailFormOpen] = useState(false)
+  const [invite, setInvite] = useState(EMPTY_INVITE)
+  const [inviting, setInviting] = useState(false)
+  const [inviteMessage, setInviteMessage] = useState({ type: '', text: '' })
 
   useEffect(() => {
     if (!dropdownOpen) return
@@ -86,6 +95,55 @@ export default function TeamTab({ id, project, users, onProjectChanged }) {
     }
   }
 
+  const inviteEmail = invite.email.trim().toLowerCase()
+  const existingByEmail = inviteEmail ? (users || []).find((u) => u.email?.toLowerCase() === inviteEmail) : null
+
+  const closeEmailForm = () => {
+    setEmailFormOpen(false)
+    setInvite(EMPTY_INVITE)
+  }
+
+  const handleAddByEmail = async (e) => {
+    e.preventDefault()
+    if (inviting) return
+    setInviteMessage({ type: '', text: '' })
+    if (!EMAIL_RE.test(inviteEmail)) {
+      setInviteMessage({ type: 'error', text: 'Enter a valid email address.' })
+      return
+    }
+
+    if (existingByEmail) {
+      if (!selectedManagers.includes(existingByEmail._id)) toggleManager(existingByEmail._id)
+      setInviteMessage({ type: 'success', text: `${existingByEmail.name} added. Click Save Team to confirm.` })
+      closeEmailForm()
+      return
+    }
+
+    if (!invite.name.trim()) {
+      setInviteMessage({ type: 'error', text: 'Enter a name for the new member.' })
+      return
+    }
+
+    setInviting(true)
+    try {
+      const { data } = await api.post('/users', { name: invite.name.trim(), email: inviteEmail, role: invite.role })
+      const newUser = flattenMembership(data.user)
+      if (!newUser) throw new Error('Unexpected response')
+      onUserAdded?.(newUser)
+      setSelectedManagers((prev) => (prev.includes(newUser._id) ? prev : [...prev, newUser._id]))
+      const devNote = data.invite?.tempPassword ? ` Dev temp password: ${data.invite.tempPassword}` : ''
+      const deliveryNote = data.joiningExistingAccount
+        ? 'They already have an account and were added to your organization.'
+        : data.invite?.delivery === 'email' ? 'An invite email has been sent.' : 'Email is not configured, so no invite was sent.'
+      setInviteMessage({ type: 'success', text: `${newUser.name} added. ${deliveryNote} Click Save Team to confirm.${devNote}` })
+      closeEmailForm()
+    } catch (err) {
+      setInviteMessage({ type: 'error', text: err.response?.data?.message || 'Failed to add member by email.' })
+    } finally {
+      setInviting(false)
+    }
+  }
+
   const filteredUsers = (users || []).filter((u) => {
     const q = managerSearch.trim().toLowerCase()
     if (!q) return true
@@ -99,11 +157,78 @@ export default function TeamTab({ id, project, users, onProjectChanged }) {
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">Team Members</h3>
-        <p className="text-sm text-gray-500 mb-4">Assign users to this project and set their designation / role for it.</p>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Team Members</h3>
+            <p className="text-sm text-gray-500">Assign users to this project and set their designation / role for it.</p>
+          </div>
+          {!emailFormOpen && (
+            <button
+              type="button"
+              onClick={() => { setEmailFormOpen(true); setInviteMessage({ type: '', text: '' }) }}
+              className="rounded-lg border border-primary-200 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50 shrink-0"
+            >
+              + Add by email
+            </button>
+          )}
+        </div>
+
+        {emailFormOpen && (
+          <form onSubmit={handleAddByEmail} className="mb-4 rounded-xl border border-gray-200 bg-slate-50 p-4 space-y-3">
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="email"
+                value={invite.email}
+                onChange={(e) => setInvite((v) => ({ ...v, email: e.target.value }))}
+                placeholder="member@example.com"
+                className="flex-1 min-w-[14rem] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                autoFocus
+                required
+              />
+              {!existingByEmail && (
+                <>
+                  <input
+                    value={invite.name}
+                    onChange={(e) => setInvite((v) => ({ ...v, name: e.target.value }))}
+                    placeholder="Full name"
+                    className="flex-1 min-w-[10rem] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                  />
+                  <select
+                    value={invite.role}
+                    onChange={(e) => setInvite((v) => ({ ...v, role: e.target.value }))}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm"
+                  >
+                    {INVITE_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              {existingByEmail
+                ? `${existingByEmail.name} is already in your organization and will be added to this project.`
+                : 'If this person is not in your organization yet, they will be invited with the selected system role.'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={closeEmailForm} className="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={inviting}
+                className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {inviting ? 'Adding...' : existingByEmail ? 'Add to team' : 'Invite & add'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {inviteMessage.text && (
+          <p className={`mb-3 text-xs ${inviteMessage.type === 'error' ? 'text-red-600' : 'text-green-700'}`}>{inviteMessage.text}</p>
+        )}
 
         {(users || []).length === 0 ? (
-          <p className="text-xs text-gray-500">No users available to assign.</p>
+          <p className="text-xs text-gray-500">No users available to assign. Use “Add by email” to invite someone.</p>
         ) : (
           <div className="relative" ref={dropdownRef}>
             <button

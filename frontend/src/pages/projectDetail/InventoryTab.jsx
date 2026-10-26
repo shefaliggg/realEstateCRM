@@ -34,9 +34,13 @@ function unitMatchesStatusPill(unit, pill) {
   return unit.status === pill
 }
 
-function exportCsv(units) {
-  const header = ['Unit', 'Tower', 'Floor', 'BHK', 'Area', 'Price', 'Status']
-  const rows = units.map((u) => [u.unitNo, u.block, u.floor, u.bhkType, u.carpetArea || '', u.basePrice || '', u.status])
+function exportCsv(units, isVillaProject) {
+  const header = isVillaProject
+    ? ['Villa', 'Style', 'BHK', 'Plot Area (sqft)', 'Built-up Area (sqft)', 'Price', 'Status']
+    : ['Unit', 'Tower', 'Floor', 'BHK', 'Area', 'Price', 'Status']
+  const rows = units.map((u) => isVillaProject
+    ? [u.unitNo, u.villaStyle || '', u.bhkType, u.plotArea || '', u.builtUpArea || '', u.basePrice || '', u.status]
+    : [u.unitNo, u.block, u.floor, u.bhkType, u.carpetArea || '', u.basePrice || '', u.status])
   const csv = [header, ...rows].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
@@ -48,6 +52,7 @@ function exportCsv(units) {
 }
 
 export default function InventoryTab({ id, project, units, onUnitsChanged }) {
+  const isVillaProject = project.type === 'Villas'
   const [filters, setFilters] = useState({ search: '', floor: '', bhk: '', status: '', minPrice: '', maxPrice: '' })
   const [selected, setSelected] = useState(new Set())
   const [statusChange, setStatusChange] = useState('')
@@ -62,7 +67,10 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
   const [statusBusyId, setStatusBusyId] = useState(null)
   const [customerPrompt, setCustomerPrompt] = useState(null)
 
-  const towers = useMemo(() => [...new Set([...(project.blocks || []), ...units.map((u) => u.block)])].sort(), [units, project.blocks])
+  const towers = useMemo(
+    () => isVillaProject ? [] : [...new Set([...(project.blocks || []), ...units.map((u) => u.block)])].sort(),
+    [units, project.blocks, isVillaProject]
+  )
   const floors = useMemo(() => [...new Set(units.map((u) => u.floor))].sort((a, b) => a - b), [units])
   const bhkTypes = useMemo(() => [...new Set(units.map((u) => u.bhkType))].sort(), [units])
 
@@ -90,9 +98,11 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
 
   const towerGroups = useMemo(() => {
     const map = {}
-    ;(project.blocks || []).forEach((b) => { map[b] = { tower: b, allUnits: [], floors: new Set() } })
+    if (!isVillaProject) {
+      ;(project.blocks || []).forEach((b) => { map[b] = { tower: b, allUnits: [], floors: new Set() } })
+    }
     units.forEach((u) => {
-      const key = u.block || 'Unspecified'
+      const key = isVillaProject ? 'Villas' : u.block || 'Unspecified'
       if (!map[key]) map[key] = { tower: key, allUnits: [], floors: new Set() }
       map[key].allUnits.push(u)
       map[key].floors.add(u.floor)
@@ -106,7 +116,7 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
         filteredUnits: g.allUnits.filter(matchesFilters).sort((a, b) => a.floor - b.floor || a.unitNo.localeCompare(b.unitNo)),
       }))
       .sort((a, b) => a.tower.localeCompare(b.tower))
-  }, [units, project.blocks, filters])
+  }, [units, project.blocks, filters, isVillaProject])
 
   const filtered = towerGroups.flatMap((g) => g.filteredUnits)
   const selectedUnits = units.filter((u) => selected.has(u._id))
@@ -189,26 +199,26 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
         <h2 className="text-lg font-semibold text-gray-900">Inventory</h2>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => openAddUnit('')} className="text-sm font-medium px-3 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700">
-            + Add Unit
+            {isVillaProject ? '+ Add Villa' : '+ Add Unit'}
           </button>
-          {towers.length > 0 && (
+          {!isVillaProject && towers.length > 0 && (
             <button onClick={() => setOpenModal('create')} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
               ⭐ Bulk Create
             </button>
           )}
-          {towers.length > 0 && (
+          {!isVillaProject && towers.length > 0 && (
             <button onClick={() => openBulkPricing(false)} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
               💰 Bulk Pricing
             </button>
           )}
-          <button onClick={() => exportCsv(filtered)} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
+          <button onClick={() => exportCsv(filtered, isVillaProject)} className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
             ⭳ Export
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <KpiCard label="Total Units" value={summary.total} />
+        <KpiCard label={isVillaProject ? 'Total Villas' : 'Total Units'} value={summary.total} />
         <KpiCard label="Available" value={summary.available} tone="text-green-600" />
         <KpiCard label="Reserved" value={summary.reserved} tone="text-yellow-600" />
         <KpiCard label="Sold" value={summary.sold} tone="text-blue-600" />
@@ -219,15 +229,15 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="text"
-            placeholder="🔍 Search unit / tower"
+            placeholder={isVillaProject ? '🔍 Search villa' : '🔍 Search unit / tower'}
             value={filters.search}
             onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
             className="flex-1 min-w-[180px] text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white"
           />
-          <select value={filters.floor} onChange={(e) => setFilters((f) => ({ ...f, floor: e.target.value }))} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
+          {!isVillaProject && <select value={filters.floor} onChange={(e) => setFilters((f) => ({ ...f, floor: e.target.value }))} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="">All Floors</option>
             {floors.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
+          </select>}
           <select value={filters.bhk} onChange={(e) => setFilters((f) => ({ ...f, bhk: e.target.value }))} className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white">
             <option value="">All BHK</option>
             {bhkTypes.map((b) => <option key={b} value={b}>{b}</option>)}
@@ -257,7 +267,7 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input type="checkbox" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleSelectAllFiltered} />
-          Select all {filtered.length} matching unit{filtered.length !== 1 ? 's' : ''}
+          Select all {filtered.length} matching {isVillaProject ? 'villa' : 'unit'}{filtered.length !== 1 ? 's' : ''}
         </label>
       </div>
 
@@ -280,7 +290,7 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
           <button disabled={busy} onClick={() => openBulkPricing(true)} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
             Bulk Price
           </button>
-          <button onClick={() => exportCsv(selectedUnits)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
+          <button           onClick={() => exportCsv(selectedUnits, isVillaProject)} className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">
             Export Selected
           </button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-gray-500 hover:text-gray-800 underline">Clear selection</button>
@@ -289,9 +299,69 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
 
       {message && <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 text-xs text-gray-600">{message}</div>}
 
-      {towerGroups.length === 0 ? (
+      {isVillaProject ? (
+        filtered.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-500">
+            {units.length > 0 ? 'No villas match your filters.' : 'No villas added yet — add a villa to get started.'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-100 bg-white shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-slate-50 text-left text-xs text-gray-500">
+                  <th className="w-10 px-3 py-3"></th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Villa</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Style / BHK</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Plot Area</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Built-up Area</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Garden</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Facing</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Price</th>
+                  <th className="px-3 py-3 font-semibold text-gray-600">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((villa) => (
+                  <tr key={villa._id} className="hover:bg-gray-50">
+                    <td className="px-3 py-3">
+                      <input type="checkbox" checked={selected.has(villa._id)} onChange={() => toggleSelect(villa._id)} aria-label={`Select villa ${villa.unitNo}`} />
+                    </td>
+                    <td className="px-3 py-3">
+                      <button type="button" onClick={() => setDrawerUnit(villa)} className="font-medium text-gray-900 hover:text-primary-600">
+                        {villa.unitNo}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 text-gray-600">{villa.villaStyle || 'Villa'} · {villa.bhkType}</td>
+                    <td className="px-3 py-3 text-gray-600">{villa.plotArea ? `${villa.plotArea} sqft` : '—'}</td>
+                    <td className="px-3 py-3 text-gray-600">{villa.builtUpArea ? `${villa.builtUpArea} sqft` : '—'}</td>
+                    <td className="px-3 py-3 text-gray-600">{villa.privateGarden ? 'Private' : villa.gardenArea ? `${villa.gardenArea} sqft` : '—'}</td>
+                    <td className="px-3 py-3 text-gray-600">{villa.facing || '—'}</td>
+                    <td className="px-3 py-3 text-gray-600">{villa.basePrice ? formatPrice(villa.basePrice) : '—'}</td>
+                    <td className="px-3 py-3">
+                      <select
+                        value={villa.status}
+                        disabled={statusBusyId === villa._id}
+                        onChange={(e) => changeUnitStatus(villa, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className={`text-xs font-medium pl-2 pr-6 py-0.5 rounded-full border-0 cursor-pointer disabled:opacity-50 ${STATUS_COLORS[villa.status] || 'bg-gray-100'}`}
+                      >
+                        {STATUS_OPTIONS.map((status) => <option key={status} value={status}>{status}</option>)}
+                      </select>
+                      {villa.currentCustomer?.name && (
+                        <p className="mt-0.5 max-w-[160px] truncate text-[11px] text-gray-500" title={`${villa.currentCustomer.name} · ${villa.currentCustomer.phone || ''}`}>
+                          👤 {villa.currentCustomer.name}
+                        </p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : towerGroups.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 bg-white px-4 py-12 text-center text-sm text-gray-500">
-          No towers added yet — add one below.
+          {isVillaProject ? 'No villas added yet — add a villa to get started.' : 'No towers added yet — add one below.'}
         </div>
       ) : (
         <div className="space-y-2">
@@ -308,11 +378,11 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
                     <svg className={`h-3.5 w-3.5 text-gray-400 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
-                    <span className="font-medium text-gray-800 truncate">Tower {group.tower}</span>
+                    <span className="font-medium text-gray-800 truncate">{isVillaProject ? 'Villas' : `Tower ${group.tower}`}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-                    <span>{group.floors} floors</span>
-                    <span>{group.total} units</span>
+                    {!isVillaProject && <span>{group.floors} floors</span>}
+                    <span>{group.total} {isVillaProject ? 'villas' : 'units'}</span>
                     <span className="text-green-600 font-medium">{group.available} available</span>
                     {hasFilters && <span className="text-primary-600 font-medium">{group.filteredUnits.length} match</span>}
                   </div>
@@ -321,8 +391,8 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
                 {expanded && (
                   <div className="border-t border-gray-100">
                     <div className="flex items-center justify-end px-3 pt-2">
-                      <button type="button" onClick={() => openAddUnit(group.tower)} className="text-xs font-medium text-primary-600 hover:text-primary-700">
-                        + Add Unit to Tower {group.tower}
+                      <button type="button" onClick={() => openAddUnit(isVillaProject ? '' : group.tower)} className="text-xs font-medium text-primary-600 hover:text-primary-700">
+                        {isVillaProject ? '+ Add Villa' : `+ Add Unit to Tower ${group.tower}`}
                       </button>
                     </div>
                     {group.filteredUnits.length === 0 ? (
@@ -334,9 +404,9 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
                             <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
                               <th className="w-10 px-3 py-2"></th>
                               <th className="text-left px-2 py-2 font-semibold text-gray-600">Unit</th>
-                              <th className="text-left px-2 py-2 font-semibold text-gray-600">Floor</th>
-                              <th className="text-left px-2 py-2 font-semibold text-gray-600">BHK</th>
-                              <th className="text-left px-2 py-2 font-semibold text-gray-600">Area</th>
+                              {!isVillaProject && <th className="text-left px-2 py-2 font-semibold text-gray-600">Floor</th>}
+                              <th className="text-left px-2 py-2 font-semibold text-gray-600">{isVillaProject ? 'Villa Type' : 'BHK'}</th>
+                              <th className="text-left px-2 py-2 font-semibold text-gray-600">{isVillaProject ? 'Plot / Built-up Area' : 'Area'}</th>
                               <th className="text-left px-2 py-2 font-semibold text-gray-600">Facing</th>
                               <th className="text-left px-2 py-2 font-semibold text-gray-600">Price</th>
                               <th className="text-left px-2 py-2 font-semibold text-gray-600">Status</th>
@@ -349,9 +419,13 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
                                 <td className="px-2 py-2">
                                   <button type="button" onClick={() => setDrawerUnit(u)} className="font-medium text-gray-900 hover:text-primary-600">{u.unitNo}</button>
                                 </td>
-                                <td className="px-2 py-2 text-gray-600">{u.floor}</td>
-                                <td className="px-2 py-2 text-gray-600">{u.bhkType}</td>
-                                <td className="px-2 py-2 text-gray-600">{u.carpetArea ? `${u.carpetArea} sqft` : '—'}</td>
+                                {!isVillaProject && <td className="px-2 py-2 text-gray-600">{u.floor}</td>}
+                                <td className="px-2 py-2 text-gray-600">{isVillaProject ? `${u.villaStyle || 'Villa'} · ${u.bhkType}` : u.bhkType}</td>
+                                <td className="px-2 py-2 text-gray-600">
+                                  {isVillaProject
+                                    ? `${u.plotArea ? `${u.plotArea} plot` : '—'} / ${u.builtUpArea ? `${u.builtUpArea} sqft` : '—'}`
+                                    : u.carpetArea ? `${u.carpetArea} sqft` : '—'}
+                                </td>
                                 <td className="px-2 py-2 text-gray-600">{u.facing || '—'}</td>
                                 <td className="px-2 py-2 text-gray-600">{u.basePrice ? formatPrice(u.basePrice) : '—'}</td>
                                 <td className="px-2 py-2">
@@ -384,14 +458,16 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Link
-          to={`/projects/${id}/towers/add`}
-          className="inline-flex items-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 text-sm font-medium transition-colors"
-        >
-          + Add Tower
-        </Link>
-      </div>
+      {!isVillaProject && (
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to={`/projects/${id}/towers/add`}
+            className="inline-flex items-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            + Add Tower
+          </Link>
+        </div>
+      )}
 
       {openModal === 'create' && (
         <Modal title="Bulk Create Flats" icon="⭐" onClose={() => setOpenModal(null)} wide>
@@ -427,6 +503,7 @@ export default function InventoryTab({ id, project, units, onUnitsChanged }) {
           unit={drawerUnit}
           projectId={id}
           bhkTypeOptions={bhkTypes}
+          isVillaProject={isVillaProject}
           onClose={() => setDrawerUnit(null)}
           onChanged={onUnitsChanged}
         />

@@ -4,15 +4,19 @@ import { EditModal, Field, inputCls, selectCls } from './editShared'
 
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
+const VILLA_STYLES = ['Independent Villa', 'Duplex Villa', 'Row Villa', 'Twin Villa']
 const PRICE_KEYS = ['basePrice', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges']
 
 export default function AddUnitModal({ projectId, project, block, onClose, onCreated }) {
   const isPlotProject = project?.type === 'Plots'
+  const isVillaProject = project?.type === 'Villas'
   const [form, setForm] = useState({
-    block: block || (isPlotProject ? 'PLOT' : (project?.blocks?.[0] || '')),
-    floor: isPlotProject ? '0' : '', unitNo: '',
+    block: isVillaProject ? 'VILLAS' : block || (isPlotProject ? 'PLOT' : (project?.blocks?.[0] || '')),
+    floor: isPlotProject || isVillaProject ? '0' : '', unitNo: '',
     bhkType: isPlotProject ? 'Plot' : (project?.bhkTypes?.[0] || '2 BHK'), facing: '', cornerUnit: false,
     carpetArea: '', builtUpArea: '', superBuiltUpArea: '', balconyArea: '',
+    plotArea: '', gardenArea: '', terraceArea: '', bathrooms: '', villaFloors: '', parkingSpaces: '',
+    villaStyle: 'Independent Villa', privateGarden: false,
     basePrice: '', pricePerSqft: '', plc: '', floorRise: '', parkingCharges: '', clubCharges: '', otherCharges: '',
     parkingIncluded: false, parkingNumber: '',
     possessionStatus: 'Under Construction', status: 'Available',
@@ -23,26 +27,38 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const totalPricePreview = PRICE_KEYS.some((k) => form[k])
-    ? PRICE_KEYS.reduce((sum, k) => sum + (Number(form[k]) || 0), 0)
+  const priceKeys = isVillaProject ? PRICE_KEYS.filter((key) => key !== 'floorRise') : PRICE_KEYS
+  const totalPricePreview = priceKeys.some((k) => form[k])
+    ? priceKeys.reduce((sum, k) => sum + (Number(form[k]) || 0), 0)
     : null
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     if (isPlotProject && !form.unitNo) { setError('Plot number is required'); return }
-    if (!isPlotProject && (!form.block || !form.floor || !form.unitNo)) { setError('Tower, floor and unit number are required'); return }
+    if (isVillaProject && !form.unitNo.trim()) { setError('Villa number is required'); return }
+    if (!isPlotProject && !isVillaProject && (!form.block || !form.floor || !form.unitNo)) { setError('Tower, floor and unit number are required'); return }
 
     setSaving(true)
     try {
       const fd = new FormData()
       const append = (key, value) => { if (value !== '' && value !== undefined && value !== null) fd.append(key, value) }
-      append('block', form.block)
-      append('floor', isPlotProject ? 0 : form.floor)
+      append('block', isVillaProject ? 'VILLAS' : form.block)
+      append('floor', isPlotProject || isVillaProject ? 0 : form.floor)
       append('unitNo', form.unitNo)
       append('bhkType', form.bhkType)
       append('facing', form.facing)
       fd.append('cornerUnit', String(form.cornerUnit))
+      fd.append('privateGarden', String(form.privateGarden))
+      if (isVillaProject) {
+        append('villaStyle', form.villaStyle)
+        append('villaFloors', form.villaFloors)
+        append('bathrooms', form.bathrooms)
+        append('plotArea', form.plotArea)
+        append('gardenArea', form.gardenArea)
+        append('terraceArea', form.terraceArea)
+        append('parkingSpaces', form.parkingSpaces)
+      }
       append('carpetArea', form.carpetArea)
       append('builtUpArea', form.builtUpArea)
       append('superBuiltUpArea', form.superBuiltUpArea)
@@ -50,7 +66,7 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
       append('basePrice', form.basePrice)
       append('pricePerSqft', form.pricePerSqft)
       append('plc', form.plc)
-      append('floorRise', form.floorRise)
+      if (!isVillaProject) append('floorRise', form.floorRise)
       append('parkingCharges', form.parkingCharges)
       append('clubCharges', form.clubCharges)
       append('otherCharges', form.otherCharges)
@@ -73,17 +89,17 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
 
   return (
     <EditModal
-      title={isPlotProject ? 'Add Plot' : `Add Flat${block ? ` — Tower ${block}` : ''}`}
+      title={isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : `Add Flat${block ? ` — Tower ${block}` : ''}`}
       icon={isPlotProject ? '📍' : '🏠'}
       onClose={onClose}
       onSubmit={handleSubmit}
       saving={saving}
       error={error}
       wide
-      submitLabel={saving ? 'Adding...' : isPlotProject ? 'Add Plot' : 'Add Unit'}
+      submitLabel={saving ? 'Adding...' : isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : 'Add Unit'}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {!isPlotProject && (
+        {!isPlotProject && !isVillaProject && (
           <>
             <Field label="Tower">
               {block ? (
@@ -99,17 +115,17 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
             <Field label="Floor"><input type="number" value={form.floor} onChange={set('floor')} className={inputCls} placeholder="3" /></Field>
           </>
         )}
-        <Field label={isPlotProject ? 'Plot No.' : 'Flat Number'}>
-          <input value={form.unitNo} onChange={set('unitNo')} className={inputCls} placeholder={isPlotProject ? 'P-101' : '301'} />
+        <Field label={isPlotProject ? 'Plot No.' : isVillaProject ? 'Villa Number' : 'Flat Number'}>
+          <input value={form.unitNo} onChange={set('unitNo')} className={inputCls} placeholder={isPlotProject ? 'P-101' : isVillaProject ? 'Villa-01' : '301'} />
         </Field>
         {!isPlotProject && (
-          <Field label="Unit Type">
+          <Field label={isVillaProject ? 'Villa BHK Type' : 'Unit Type'}>
             <select value={form.bhkType} onChange={set('bhkType')} className={selectCls}>
               {(project?.bhkTypes?.length ? project.bhkTypes : BHK_TYPES).map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </Field>
         )}
-        {!isPlotProject && (
+        {!isPlotProject && !isVillaProject && (
           <Field label="Facing">
             <select value={form.facing} onChange={set('facing')} className={selectCls}>
               <option value="">Select facing...</option>
@@ -119,13 +135,58 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
         )}
       </div>
 
-      {!isPlotProject && (
+      {!isPlotProject && !isVillaProject && (
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={form.cornerUnit} onChange={(e) => setForm((f) => ({ ...f, cornerUnit: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
           <span className="text-sm text-gray-600">This is a corner unit</span>
         </label>
       )}
 
+      {isVillaProject ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Field label="Villa Style">
+              <select value={form.villaStyle} onChange={set('villaStyle')} className={selectCls}>
+                {VILLA_STYLES.map((style) => <option key={style}>{style}</option>)}
+              </select>
+            </Field>
+            <Field label="Bathrooms">
+              <input type="number" min="0" value={form.bathrooms} onChange={set('bathrooms')} className={inputCls} />
+            </Field>
+            <Field label="Villa Floors">
+              <input type="number" min="1" value={form.villaFloors} onChange={set('villaFloors')} className={inputCls} placeholder="2" />
+            </Field>
+            <Field label="Plot Area (sqft)">
+              <input type="number" min="0" value={form.plotArea} onChange={set('plotArea')} className={inputCls} />
+            </Field>
+            <Field label="Built-up Area (sqft)">
+              <input type="number" min="0" value={form.builtUpArea} onChange={set('builtUpArea')} className={inputCls} />
+            </Field>
+            <Field label="Carpet Area (sqft)">
+              <input type="number" min="0" value={form.carpetArea} onChange={set('carpetArea')} className={inputCls} />
+            </Field>
+            <Field label="Garden Area (sqft)">
+              <input type="number" min="0" value={form.gardenArea} onChange={set('gardenArea')} className={inputCls} />
+            </Field>
+            <Field label="Terrace Area (sqft)">
+              <input type="number" min="0" value={form.terraceArea} onChange={set('terraceArea')} className={inputCls} />
+            </Field>
+            <Field label="Parking Spaces">
+              <input type="number" min="0" value={form.parkingSpaces} onChange={set('parkingSpaces')} className={inputCls} />
+            </Field>
+            <Field label="Facing">
+              <select value={form.facing} onChange={set('facing')} className={selectCls}>
+                <option value="">Select facing...</option>
+                {FACING.map((f) => <option key={f}>{f}</option>)}
+              </select>
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.privateGarden} onChange={(e) => setForm((f) => ({ ...f, privateGarden: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
+            <span className="text-sm text-gray-600">Private garden included</span>
+          </label>
+        </>
+      ) : (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Field label={isPlotProject ? 'Plot Area (sqyd)' : 'Carpet Area (sqft)'}>
           <input type="number" value={form.carpetArea} onChange={set('carpetArea')} className={inputCls} />
@@ -138,12 +199,13 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
           </>
         )}
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <Field label="Base Price (₹)"><input type="number" value={form.basePrice} onChange={set('basePrice')} className={inputCls} /></Field>
         <Field label="Price / Sq.ft (₹)"><input type="number" value={form.pricePerSqft} onChange={set('pricePerSqft')} className={inputCls} /></Field>
         <Field label="PLC (₹)"><input type="number" value={form.plc} onChange={set('plc')} className={inputCls} /></Field>
-        <Field label="Floor Rise (₹)"><input type="number" value={form.floorRise} onChange={set('floorRise')} className={inputCls} /></Field>
+        {!isVillaProject && <Field label="Floor Rise (₹)"><input type="number" value={form.floorRise} onChange={set('floorRise')} className={inputCls} /></Field>}
         <Field label="Parking Charges (₹)"><input type="number" value={form.parkingCharges} onChange={set('parkingCharges')} className={inputCls} /></Field>
         <Field label="Club Charges (₹)"><input type="number" value={form.clubCharges} onChange={set('clubCharges')} className={inputCls} /></Field>
         <Field label="Other Charges (₹)"><input type="number" value={form.otherCharges} onChange={set('otherCharges')} className={inputCls} /></Field>
@@ -161,7 +223,7 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
             <input type="checkbox" checked={form.parkingIncluded} onChange={(e) => setForm((f) => ({ ...f, parkingIncluded: e.target.checked }))} className="w-4 h-4 accent-primary-600" />
             <span className="text-sm text-gray-600">Parking included with this unit</span>
           </label>
-          <Field label="Parking Number"><input value={form.parkingNumber} onChange={set('parkingNumber')} className={inputCls} placeholder="P-104" /></Field>
+          {!isVillaProject && <Field label="Parking Number"><input value={form.parkingNumber} onChange={set('parkingNumber')} className={inputCls} placeholder="P-104" /></Field>}
         </div>
       )}
 

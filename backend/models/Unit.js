@@ -22,6 +22,14 @@ const unitSchema = new mongoose.Schema(
     builtUpArea: { type: Number },
     superBuiltUpArea: { type: Number },
     balconyArea: { type: Number },
+    plotArea: { type: Number },
+    gardenArea: { type: Number },
+    terraceArea: { type: Number },
+    bathrooms: { type: Number },
+    villaFloors: { type: Number },
+    parkingSpaces: { type: Number },
+    villaStyle: { type: String, trim: true },
+    privateGarden: { type: Boolean, default: false },
 
     basePrice: { type: Number },                              // INR
     pricePerSqft: { type: Number },

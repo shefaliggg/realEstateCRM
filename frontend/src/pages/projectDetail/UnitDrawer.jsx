@@ -23,7 +23,7 @@ const PRICE_ROWS = [
   ['otherCharges', 'Other Charges'],
 ]
 
-export default function UnitDrawer({ unit, projectId, bhkTypeOptions, onClose, onChanged }) {
+export default function UnitDrawer({ unit, projectId, bhkTypeOptions, isVillaProject = false, onClose, onChanged }) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -59,6 +59,7 @@ export default function UnitDrawer({ unit, projectId, bhkTypeOptions, onClose, o
         projectId={projectId}
         unit={unit}
         bhkTypeOptions={bhkTypeOptions}
+        isVillaProject={isVillaProject}
         onClose={() => setEditing(false)}
         onSaved={() => { setEditing(false); onChanged?.(); onClose() }}
       />
@@ -67,7 +68,7 @@ export default function UnitDrawer({ unit, projectId, bhkTypeOptions, onClose, o
 
   return (
     <Drawer
-      title={`Tower ${unit.block} – ${unit.unitNo}`}
+      title={isVillaProject ? `Villa ${unit.unitNo}` : `Tower ${unit.block} – ${unit.unitNo}`}
       icon="🏠"
       onClose={onClose}
       footer={(
@@ -90,11 +91,21 @@ export default function UnitDrawer({ unit, projectId, bhkTypeOptions, onClose, o
         <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Basic Information</h3>
           <dl className="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
-            <div><dt className="text-gray-500">Tower</dt><dd className="font-medium mt-0.5">{unit.block}</dd></div>
-            <div><dt className="text-gray-500">Floor</dt><dd className="font-medium mt-0.5">{unit.floor}</dd></div>
-            <div><dt className="text-gray-500">Type</dt><dd className="font-medium mt-0.5">{unit.bhkType}</dd></div>
+            {!isVillaProject && <div><dt className="text-gray-500">Tower</dt><dd className="font-medium mt-0.5">{unit.block}</dd></div>}
+            {!isVillaProject && <div><dt className="text-gray-500">Floor</dt><dd className="font-medium mt-0.5">{unit.floor}</dd></div>}
+            {isVillaProject && <div><dt className="text-gray-500">Villa Style</dt><dd className="font-medium mt-0.5">{unit.villaStyle || '—'}</dd></div>}
+            <div><dt className="text-gray-500">{isVillaProject ? 'Villa Type' : 'Type'}</dt><dd className="font-medium mt-0.5">{unit.bhkType}</dd></div>
             <div><dt className="text-gray-500">Facing</dt><dd className="font-medium mt-0.5">{unit.facing || '—'}</dd></div>
-            <div><dt className="text-gray-500">Carpet Area</dt><dd className="font-medium mt-0.5">{unit.carpetArea ? `${unit.carpetArea} sqft` : '—'}</dd></div>
+            {isVillaProject && <>
+              <div><dt className="text-gray-500">Bathrooms</dt><dd className="font-medium mt-0.5">{unit.bathrooms || '—'}</dd></div>
+              <div><dt className="text-gray-500">Villa Floors</dt><dd className="font-medium mt-0.5">{unit.villaFloors || '—'}</dd></div>
+              <div><dt className="text-gray-500">Plot Area</dt><dd className="font-medium mt-0.5">{unit.plotArea ? `${unit.plotArea} sqft` : '—'}</dd></div>
+              <div><dt className="text-gray-500">Garden Area</dt><dd className="font-medium mt-0.5">{unit.gardenArea ? `${unit.gardenArea} sqft` : '—'}</dd></div>
+              <div><dt className="text-gray-500">Terrace Area</dt><dd className="font-medium mt-0.5">{unit.terraceArea ? `${unit.terraceArea} sqft` : '—'}</dd></div>
+              <div><dt className="text-gray-500">Parking Spaces</dt><dd className="font-medium mt-0.5">{unit.parkingSpaces ?? '—'}</dd></div>
+              <div><dt className="text-gray-500">Private Garden</dt><dd className="font-medium mt-0.5">{unit.privateGarden ? 'Yes' : 'No'}</dd></div>
+            </>}
+            <div><dt className="text-gray-500">{isVillaProject ? 'Interior Area' : 'Carpet Area'}</dt><dd className="font-medium mt-0.5">{unit.carpetArea ? `${unit.carpetArea} sqft` : '—'}</dd></div>
             <div><dt className="text-gray-500">Built-up Area</dt><dd className="font-medium mt-0.5">{unit.builtUpArea ? `${unit.builtUpArea} sqft` : '—'}</dd></div>
           </dl>
         </div>

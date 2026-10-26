@@ -6,7 +6,7 @@ import { getDefaultProduct } from '../config/products'
 const passwordPolicyHint = '8+ chars with uppercase, lowercase, number and special character.'
 
 export default function LoginPage() {
-  const { login, setPassword, selectBuilder } = useAuth()
+  const { login, setPassword, selectBuilder, logout } = useAuth()
   const navigate = useNavigate()
 
   const [form, setForm] = useState({ email: '', password: '' })
@@ -41,6 +41,13 @@ export default function LoginPage() {
       }
       if (data.requiresBuilderSelection) {
         setMemberships(data.memberships)
+        return
+      }
+      // Platform accounts get a session with no builderId, which PrivateRoute
+      // bounces straight back here — say why instead of silently looping.
+      if (!data.builderId) {
+        logout()
+        setError('This is a PropVault platform account. Sign in through the admin portal instead.')
         return
       }
       navigate(getDefaultProduct(data.role).homePath)

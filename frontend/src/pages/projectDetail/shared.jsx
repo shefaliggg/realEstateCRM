@@ -168,3 +168,7 @@ export function computeActivityEvents(units, bookings, payments, userById, limit
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, limit)
 }
+
+// GET /users returns Membership rows ({ membershipId, role, status, user }) —
+// flatten them into the { _id, name, email, role } shape the tabs work with.
+export const flattenMembership = (m) => (m?.user ? { ...m.user, role: m.role, membershipId: m.membershipId, status: m.status } : null)

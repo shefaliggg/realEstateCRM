@@ -10,9 +10,10 @@ const uploadedFileUrl = (bucket) =>
 
 const NUMBER_FIELDS = [
   'floor', 'carpetArea', 'builtUpArea', 'superBuiltUpArea', 'balconyArea',
+  'plotArea', 'gardenArea', 'terraceArea', 'bathrooms', 'villaFloors', 'parkingSpaces',
   'basePrice', 'pricePerSqft', 'plc', 'floorRise', 'parkingCharges', 'clubCharges', 'otherCharges',
 ]
-const BOOLEAN_FIELDS = ['cornerUnit', 'parkingIncluded']
+const BOOLEAN_FIELDS = ['cornerUnit', 'parkingIncluded', 'privateGarden']
 
 const normalizeUnitBody = (body, files = {}) => {
   const payload = { ...body }
