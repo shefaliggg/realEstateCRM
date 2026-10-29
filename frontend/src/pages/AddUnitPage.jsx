@@ -5,6 +5,8 @@ import api from '../api/axios'
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
 const VILLA_STYLES = ['Independent Villa', 'Duplex Villa', 'Row Villa', 'Twin Villa']
+const COMMERCIAL_UNIT_TYPES = ['Office space', 'Retail shop', 'Showroom', 'Food court', 'Restaurant', 'Co-working', 'Warehouse', 'Anchor store']
+const FURNISHING_OPTIONS = ['Bare shell', 'Warm shell', 'Semi-furnished', 'Furnished', 'Plug & play']
 
 const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300'
 
@@ -32,6 +34,7 @@ const EMPTY_FORM = {
   carpetArea: '', builtUpArea: '', superBuiltUpArea: '', balconyArea: '',
   plotArea: '', gardenArea: '', terraceArea: '', bathrooms: '', villaFloors: '', parkingSpaces: '',
   villaStyle: 'Independent Villa', privateGarden: false,
+  frontage: '', ceilingHeight: '', powerLoad: '', furnishingStatus: 'Bare shell', pantry: false, maintenancePerSqft: '',
   basePrice: '', pricePerSqft: '', plc: '', floorRise: '', parkingCharges: '', clubCharges: '', otherCharges: '',
   parkingIncluded: false, parkingNumber: '',
   possessionStatus: 'Under Construction',
@@ -43,6 +46,7 @@ export default function AddUnitPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const blockFromUrl = searchParams.get('block') || ''
+  const returnTo = searchParams.get('returnTo') || ''
   const [project, setProject] = useState(null)
   const [form, setForm] = useState({ ...EMPTY_FORM, block: blockFromUrl })
   const [files, setFiles] = useState({ floorPlan: null, priceSheet: null })
@@ -50,6 +54,8 @@ export default function AddUnitPage() {
   const [loading, setLoading] = useState(false)
   const isPlotProject = project?.type === 'Plots'
   const isVillaProject = project?.type === 'Villas'
+  const isCommercialProject = project?.type === 'Commercial'
+  const backPath = returnTo || (blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`)
 
   useEffect(() => {
     api.get(`/projects/${projectId}`)
@@ -61,6 +67,10 @@ export default function AddUnitPage() {
         }
         if (r.data.type === 'Villas') {
           setForm((f) => ({ ...f, block: 'VILLAS', floor: '0', bhkType: r.data.bhkTypes?.[0] || '3 BHK' }))
+          return
+        }
+        if (r.data.type === 'Commercial') {
+          setForm((f) => ({ ...f, block: 'COMMERCIAL', bhkType: r.data.bhkTypes?.[0] || COMMERCIAL_UNIT_TYPES[0] }))
           return
         }
         if (!blockFromUrl && r.data.blocks?.length > 0) setForm(f => ({ ...f, block: r.data.blocks[0] }))
@@ -90,7 +100,15 @@ export default function AddUnitPage() {
       setError('Villa number is required')
       return
     }
-    if (!isPlotProject && !isVillaProject && (!form.block || !form.floor || !form.unitNo)) {
+    if (isCommercialProject && (form.floor === '' || !form.unitNo.trim())) {
+      setError('Floor and unit number are required')
+      return
+    }
+    if (isCommercialProject && !form.carpetArea) {
+      setError('Carpet area is required')
+      return
+    }
+    if (!isPlotProject && !isVillaProject && !isCommercialProject && (!form.block || !form.floor || !form.unitNo)) {
       setError('Tower, floor and unit number are required')
       return
     }
@@ -99,7 +117,7 @@ export default function AddUnitPage() {
       const fd = new FormData()
       const append = (key, value) => { if (value !== '' && value !== undefined && value !== null) fd.append(key, value) }
 
-      append('block', isVillaProject ? 'VILLAS' : isPlotProject ? (form.block || 'PLOT') : form.block)
+      append('block', isVillaProject ? 'VILLAS' : isCommercialProject ? 'COMMERCIAL' : isPlotProject ? (form.block || 'PLOT') : form.block)
       append('floor', isPlotProject || isVillaProject ? 0 : form.floor)
       append('unitNo', form.unitNo)
       append('bhkType', isPlotProject ? (form.bhkType || 'Plot') : form.bhkType)
@@ -115,6 +133,16 @@ export default function AddUnitPage() {
         append('terraceArea', form.terraceArea)
         append('parkingSpaces', form.parkingSpaces)
       }
+      if (isCommercialProject) {
+        append('frontage', form.frontage)
+        append('ceilingHeight', form.ceilingHeight)
+        append('powerLoad', form.powerLoad)
+        append('furnishingStatus', form.furnishingStatus)
+        append('bathrooms', form.bathrooms)
+        append('parkingSpaces', form.parkingSpaces)
+        append('maintenancePerSqft', form.maintenancePerSqft)
+        fd.append('pantry', String(form.pantry))
+      }
 
       append('carpetArea', form.carpetArea)
       append('builtUpArea', form.builtUpArea)
@@ -126,7 +154,7 @@ export default function AddUnitPage() {
       append('plc', form.plc)
       if (!isVillaProject) append('floorRise', form.floorRise)
       append('parkingCharges', form.parkingCharges)
-      append('clubCharges', form.clubCharges)
+      if (!isCommercialProject) append('clubCharges', form.clubCharges)
       append('otherCharges', form.otherCharges)
 
       fd.append('parkingIncluded', String(form.parkingIncluded))
@@ -137,7 +165,7 @@ export default function AddUnitPage() {
       if (files.priceSheet) fd.append('priceSheet', files.priceSheet)
 
       await api.post(`/projects/${projectId}/units`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      navigate(blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`)
+      navigate(backPath)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create unit')
     } finally {
@@ -162,11 +190,11 @@ export default function AddUnitPage() {
           </>
         )}
         <span>/</span>
-        <span className="text-gray-900 font-medium">{isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : 'Add Flat'}</span>
+        <span className="text-gray-900 font-medium">{isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : isCommercialProject ? 'Add Commercial Unit' : 'Add Flat'}</span>
       </div>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        {isPlotProject ? '📍 Add Plot' : isVillaProject ? '🏡 Add Villa' : `🏠 Add Flat${blockFromUrl ? ` — Tower ${blockFromUrl}` : ''}`}
+        {isPlotProject ? '📍 Add Plot' : isVillaProject ? '🏡 Add Villa' : isCommercialProject ? '🏬 Add Commercial Unit' : `🏠 Add Flat${blockFromUrl ? ` — Tower ${blockFromUrl}` : ''}`}
       </h1>
 
       {error && (
@@ -176,7 +204,12 @@ export default function AddUnitPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         <SectionCard title="Basic" icon="📐">
           <div className="grid grid-cols-2 gap-4">
-            {!isPlotProject && !isVillaProject && (
+            {isCommercialProject && (
+              <Field label="Floor *">
+                <input name="floor" value={form.floor} onChange={handleChange} type="number" min="0" required className={inputCls} placeholder="0 = Ground" />
+              </Field>
+            )}
+            {!isPlotProject && !isVillaProject && !isCommercialProject && (
               <>
                 <Field label="Tower *">
                   {blockFromUrl ? (
@@ -194,8 +227,8 @@ export default function AddUnitPage() {
                 </Field>
               </>
             )}
-            <Field label={isPlotProject ? 'Plot No. *' : isVillaProject ? 'Villa Number *' : 'Flat Number *'}>
-              <input name="unitNo" value={form.unitNo} onChange={handleChange} required className={inputCls} placeholder={isPlotProject ? 'P-101' : isVillaProject ? 'Villa-01' : '301'} />
+            <Field label={isPlotProject ? 'Plot No. *' : isVillaProject ? 'Villa Number *' : isCommercialProject ? 'Unit / Shop Number *' : 'Flat Number *'}>
+              <input name="unitNo" value={form.unitNo} onChange={handleChange} required className={inputCls} placeholder={isPlotProject ? 'P-101' : isVillaProject ? 'Villa-01' : isCommercialProject ? 'S-012' : '301'} />
             </Field>
           </div>
         </SectionCard>
@@ -205,7 +238,7 @@ export default function AddUnitPage() {
             <div className="grid grid-cols-2 gap-4">
               <Field label={isVillaProject ? 'Villa BHK Type' : 'Unit Type'}>
                 <select name="bhkType" value={form.bhkType} onChange={handleChange} className={inputCls}>
-                  {(project?.bhkTypes?.length ? project.bhkTypes : BHK_TYPES).map(b => <option key={b} value={b}>{b}</option>)}
+                  {(project?.bhkTypes?.length ? project.bhkTypes : isCommercialProject ? COMMERCIAL_UNIT_TYPES : BHK_TYPES).map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </Field>
               <Field label="Facing">
@@ -268,6 +301,44 @@ export default function AddUnitPage() {
               <span className="text-sm text-gray-600">Private garden included</span>
             </label>
           </SectionCard>
+        ) : isCommercialProject ? (
+          <SectionCard title="Commercial Details & Areas" icon="🏬">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Carpet Area (sqft) *">
+                <input name="carpetArea" type="number" min="0" value={form.carpetArea} onChange={handleChange} required className={inputCls} placeholder="850" />
+              </Field>
+              <Field label="Built-up Area (sqft)">
+                <input name="builtUpArea" type="number" min="0" value={form.builtUpArea} onChange={handleChange} className={inputCls} />
+              </Field>
+              <Field label="Super Built-up Area (sqft)">
+                <input name="superBuiltUpArea" type="number" min="0" value={form.superBuiltUpArea} onChange={handleChange} className={inputCls} />
+              </Field>
+              <Field label="Frontage (ft)">
+                <input name="frontage" type="number" min="0" value={form.frontage} onChange={handleChange} className={inputCls} placeholder="20" />
+              </Field>
+              <Field label="Ceiling Height (ft)">
+                <input name="ceilingHeight" type="number" min="0" step="0.1" value={form.ceilingHeight} onChange={handleChange} className={inputCls} placeholder="14" />
+              </Field>
+              <Field label="Power Load (kVA)">
+                <input name="powerLoad" type="number" min="0" value={form.powerLoad} onChange={handleChange} className={inputCls} placeholder="10" />
+              </Field>
+              <Field label="Washrooms">
+                <input name="bathrooms" type="number" min="0" value={form.bathrooms} onChange={handleChange} className={inputCls} />
+              </Field>
+              <Field label="Parking Spaces">
+                <input name="parkingSpaces" type="number" min="0" value={form.parkingSpaces} onChange={handleChange} className={inputCls} />
+              </Field>
+              <Field label="Furnishing">
+                <select name="furnishingStatus" value={form.furnishingStatus} onChange={handleChange} className={inputCls}>
+                  {FURNISHING_OPTIONS.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              </Field>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.pantry} onChange={(e) => set('pantry', e.target.checked)} className="w-4 h-4 accent-primary-600" />
+              <span className="text-sm text-gray-600">Private pantry included</span>
+            </label>
+          </SectionCard>
         ) : <SectionCard title="Area" icon="📏">
           <div className="grid grid-cols-2 gap-4">
             <Field label={isPlotProject ? 'Plot Area (sqyd)' : 'Carpet Area (sqft)'}>
@@ -306,9 +377,15 @@ export default function AddUnitPage() {
             <Field label="Parking Charges (₹)">
               <input name="parkingCharges" value={form.parkingCharges} onChange={handleChange} type="number" min="0" className={inputCls} />
             </Field>
-            <Field label="Club Charges (₹)">
-              <input name="clubCharges" value={form.clubCharges} onChange={handleChange} type="number" min="0" className={inputCls} />
-            </Field>
+            {isCommercialProject ? (
+              <Field label="Maintenance / Sq.ft / month (₹)">
+                <input name="maintenancePerSqft" value={form.maintenancePerSqft} onChange={handleChange} type="number" min="0" className={inputCls} />
+              </Field>
+            ) : (
+              <Field label="Club Charges (₹)">
+                <input name="clubCharges" value={form.clubCharges} onChange={handleChange} type="number" min="0" className={inputCls} />
+              </Field>
+            )}
             <Field label="Other Charges (₹)">
               <input name="otherCharges" value={form.otherCharges} onChange={handleChange} type="number" min="0" className={inputCls} />
             </Field>
@@ -367,9 +444,9 @@ export default function AddUnitPage() {
         <div className="flex gap-3">
           <button type="submit" disabled={loading}
             className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-            {loading ? 'Adding...' : isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : 'Add Unit'}
+            {loading ? 'Adding...' : isPlotProject ? 'Add Plot' : isVillaProject ? 'Add Villa' : isCommercialProject ? 'Add Commercial Unit' : 'Add Unit'}
           </button>
-          <Link to={blockFromUrl ? `/projects/${projectId}/blocks/${blockFromUrl}` : `/projects/${projectId}`}
+          <Link to={backPath}
             className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-6 py-2 rounded-lg text-sm font-medium transition-colors">
             Cancel
           </Link>

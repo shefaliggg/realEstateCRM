@@ -31,6 +31,10 @@ const COUNT_FIELDS = ['numberOfTowers', 'numberOfFloors', 'totalUnits', 'totalBl
 const SALES_INFO_TEXT_FIELDS = ['salesOfficeAddress', 'siteOfficeContact', 'crmNotes']
 const CONTACT_FIELDS = ['salesPhone', 'alternatePhone', 'whatsapp', 'email', 'website']
 const SEO_TEXT_FIELDS = ['slug', 'metaTitle', 'metaDescription']
+const PRICING_NUMBER_FIELDS = [
+  'priceStart', 'priceEnd', 'basePricePerSqft', 'plcCharges', 'floorRiseCharges',
+  'parkingCharges', 'clubMembershipFee', 'registrationCharges', 'otherCharges',
+]
 
 const normalizeProjectPayload = (body, files = []) => {
   const payload = {}
@@ -66,6 +70,15 @@ const normalizeProjectPayload = (body, files = []) => {
     if (body.bankLoanAvailable !== undefined) payload.salesInfo.bankLoanAvailable = parseBooleanField(body.bankLoanAvailable)
     const approvedBanks = parseArrayField(body.approvedBanks)
     if (approvedBanks !== undefined) payload.salesInfo.approvedBanks = approvedBanks
+  }
+
+  const hasPricingInput = [...PRICING_NUMBER_FIELDS, 'gstApplicable'].some((f) => body[f] !== undefined)
+  if (hasPricingInput) {
+    payload.pricing = {}
+    PRICING_NUMBER_FIELDS.forEach((field) => {
+      if (body[field] !== undefined) payload.pricing[field] = parseNumberField(body[field])
+    })
+    if (body.gstApplicable !== undefined) payload.pricing.gstApplicable = parseBooleanField(body.gstApplicable)
   }
 
   const hasContactInput = CONTACT_FIELDS.some((f) => body[f] !== undefined)
@@ -161,7 +174,7 @@ const normalizeProjectPayload = (body, files = []) => {
   return payload
 }
 
-const NESTED_GROUP_KEYS = ['location', 'salesInfo', 'contact', 'seo', 'documents']
+const NESTED_GROUP_KEYS = ['location', 'pricing', 'salesInfo', 'contact', 'seo', 'documents']
 
 const getProjects = async (req, res) => {
   try {

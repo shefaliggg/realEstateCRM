@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api from '../../api/axios'
 import { EditModal, Field, inputCls, selectCls } from './editShared'
+import { COMMERCIAL_UNIT_TYPES } from './shared'
 
 const FACING = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West']
 const BHK_TYPES = ['Studio', '1 BHK', '1.5 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', '4.5 BHK', '5 BHK', 'Duplex', 'Penthouse']
@@ -10,10 +11,14 @@ const PRICE_KEYS = ['basePrice', 'plc', 'floorRise', 'parkingCharges', 'clubChar
 export default function AddUnitModal({ projectId, project, block, onClose, onCreated }) {
   const isPlotProject = project?.type === 'Plots'
   const isVillaProject = project?.type === 'Villas'
+  const isMixedUseProject = project?.type === 'Mixed Use'
+  // Mixed use bhkTypes also list commercial unit types; flats only offer the residential ones
+  const projectBhkTypes = (project?.bhkTypes || []).filter((b) => !isMixedUseProject || !COMMERCIAL_UNIT_TYPES.includes(b))
+  const bhkTypeOptions = projectBhkTypes.length ? projectBhkTypes : BHK_TYPES
   const [form, setForm] = useState({
     block: isVillaProject ? 'VILLAS' : block || (isPlotProject ? 'PLOT' : (project?.blocks?.[0] || '')),
     floor: isPlotProject || isVillaProject ? '0' : '', unitNo: '',
-    bhkType: isPlotProject ? 'Plot' : (project?.bhkTypes?.[0] || '2 BHK'), facing: '', cornerUnit: false,
+    bhkType: isPlotProject ? 'Plot' : (bhkTypeOptions[0] || '2 BHK'), facing: '', cornerUnit: false,
     carpetArea: '', builtUpArea: '', superBuiltUpArea: '', balconyArea: '',
     plotArea: '', gardenArea: '', terraceArea: '', bathrooms: '', villaFloors: '', parkingSpaces: '',
     villaStyle: 'Independent Villa', privateGarden: false,
@@ -47,6 +52,7 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
       append('floor', isPlotProject || isVillaProject ? 0 : form.floor)
       append('unitNo', form.unitNo)
       append('bhkType', form.bhkType)
+      if (isMixedUseProject) append('unitCategory', 'Residential')
       append('facing', form.facing)
       fd.append('cornerUnit', String(form.cornerUnit))
       fd.append('privateGarden', String(form.privateGarden))
@@ -121,7 +127,7 @@ export default function AddUnitModal({ projectId, project, block, onClose, onCre
         {!isPlotProject && (
           <Field label={isVillaProject ? 'Villa BHK Type' : 'Unit Type'}>
             <select value={form.bhkType} onChange={set('bhkType')} className={selectCls}>
-              {(project?.bhkTypes?.length ? project.bhkTypes : BHK_TYPES).map((b) => <option key={b} value={b}>{b}</option>)}
+              {bhkTypeOptions.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
           </Field>
         )}

@@ -79,6 +79,7 @@ import CustomerDocumentsPage from './pages/customer/CustomerDocumentsPage'
 import ConstructionUpdatesPage from './pages/customer/ConstructionUpdatesPage'
 import CustomerSupportPage from './pages/customer/CustomerSupportPage'
 import CustomerProfilePage from './pages/customer/CustomerProfilePage'
+import HelpPage from './pages/HelpPage'
 
 const STAFF_ROLES = [
   'builder_admin',
@@ -175,6 +176,7 @@ export default function App() {
           <Route path="/users/:id" element={<PR allowedRoles={['builder_admin']}><UserProfilePage /></PR>} />
           <Route path="/permissions" element={<PR allowedRoles={['builder_admin']}><PermissionsPage /></PR>} />
           <Route path="/profile" element={<PR><ProfilePage /></PR>} />
+          <Route path="/help" element={<PR allowedRoles={STAFF_ROLES}><HelpPage /></PR>} />
           <Route path="/settings" element={<PR allowedRoles={STAFF_ROLES}><SettingsPage /></PR>} />
           <Route path="/settings/company-profile" element={<PR allowedRoles={STAFF_ROLES}><CompanyProfilePage /></PR>} />
           <Route path="/settings/teams" element={<PR allowedRoles={STAFF_ROLES}><ComingSoonCard title="Teams" description="Team management is planned for a future phase." /></PR>} />
@@ -198,6 +200,7 @@ export default function App() {
           <Route path="/partner/downloads" element={<PR allowedRoles={PARTNER_ROLES}><PartnerDownloadsPage /></PR>} />
           <Route path="/partner/support" element={<PR allowedRoles={PARTNER_ROLES}><PartnerSupportPage /></PR>} />
           <Route path="/partner/profile" element={<PR allowedRoles={PARTNER_ROLES}><PortalProfilePage /></PR>} />
+          <Route path="/partner/help" element={<PR allowedRoles={PARTNER_ROLES}><HelpPage /></PR>} />
 
           {/* Customer Portal */}
           <Route path="/customer-portal" element={<PR allowedRoles={CUSTOMER_ROLES}><CustomerDashboardPage /></PR>} />
@@ -208,6 +211,7 @@ export default function App() {
           <Route path="/customer-portal/construction-updates" element={<PR allowedRoles={CUSTOMER_ROLES}><ConstructionUpdatesPage /></PR>} />
           <Route path="/customer-portal/support" element={<PR allowedRoles={CUSTOMER_ROLES}><CustomerSupportPage /></PR>} />
           <Route path="/customer-portal/profile" element={<PR allowedRoles={CUSTOMER_ROLES}><CustomerProfilePage /></PR>} />
+          <Route path="/customer-portal/help" element={<PR allowedRoles={CUSTOMER_ROLES}><HelpPage /></PR>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

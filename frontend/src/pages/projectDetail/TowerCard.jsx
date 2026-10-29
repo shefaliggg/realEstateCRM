@@ -7,7 +7,7 @@ const STATUS_COLORS = {
   Ready: 'bg-green-100 text-green-700',
 }
 
-export default function TowerCard({ id, tower }) {
+export default function TowerCard({ id, tower, categorySplit = null }) {
   const stats = tower.unitStats || {}
   const sold = stats.registered || 0
 
@@ -32,13 +32,20 @@ export default function TowerCard({ id, tower }) {
         </div>
         <div className="rounded-lg bg-slate-50 py-2">
           <p className="font-bold text-gray-900 text-sm">{tower.numberOfFlats || stats.total || '—'}</p>
-          <p className="text-[10px] text-gray-400 uppercase tracking-wide">Flats</p>
+          <p className="text-[10px] text-gray-400 uppercase tracking-wide">{categorySplit ? 'Units' : 'Flats'}</p>
         </div>
         <div className="rounded-lg bg-slate-50 py-2">
           <p className="font-bold text-gray-900 text-sm">{tower.numberOfLifts ?? '—'}</p>
           <p className="text-[10px] text-gray-400 uppercase tracking-wide">Lifts</p>
         </div>
       </div>
+
+      {categorySplit && (
+        <div className="flex items-center gap-2 text-[11px] mb-3">
+          <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">🏠 {categorySplit.residential} Residential</span>
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 font-medium text-amber-700">🏬 {categorySplit.commercial} Commercial</span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs mb-2">
         <span className="text-green-600 font-medium">Available {stats.available || 0}</span>

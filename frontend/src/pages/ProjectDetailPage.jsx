@@ -41,16 +41,21 @@ export default function ProjectDetailPage() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState('overview')
   const [headerModal, setHeaderModal] = useState(null)
+  // Asks the inventory tab to open its add form (plots use the in-tab modal, not the add-unit page)
+  const [addUnitRequested, setAddUnitRequested] = useState(false)
   const isVillaProject = project?.type === 'Villas'
+  const isCommercialProject = project?.type === 'Commercial'
+  const isPlotProject = project?.type === 'Plots'
+  const hasTowers = !isVillaProject && !isCommercialProject && !isPlotProject
 
   const handleProjectChanged = useCallback((p) => setProject((prev) => ({ ...prev, ...p })), [])
   const handleUserAdded = useCallback((u) => setUsers((prev) => (prev.some((x) => x._id === u._id) ? prev : [u, ...prev])), [])
 
   useEffect(() => {
-    if (isVillaProject && tab === 'towers') {
+    if (!hasTowers && tab === 'towers') {
       setTab('overview')
     }
-  }, [isVillaProject, tab])
+  }, [hasTowers, tab])
 
   const refetchUnits = useCallback(() => {
     api.get(`/projects/${id}/units`).then((res) => setUnits(res.data)).catch(() => {})
@@ -91,7 +96,7 @@ export default function ProjectDetailPage() {
   if (!project) return null
 
   const userById = new Map(users.map((u) => [u._id, u]))
-  const tabs = isVillaProject ? BASE_TABS : [...BASE_TABS.slice(0, 2), TOWER_TAB, ...BASE_TABS.slice(2)]
+  const tabs = !hasTowers ? BASE_TABS : [...BASE_TABS.slice(0, 2), TOWER_TAB, ...BASE_TABS.slice(2)]
 
   const locationParts = [
     project.location?.address, project.location?.landmark, project.location?.locality, project.location?.city,
@@ -131,7 +136,7 @@ export default function ProjectDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary-600 to-primary-500" />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-gray-200/85 via-gray-100/70 to-gray-50/50" />
-          <HoverPhotoEdit onClick={() => setHeaderModal('cover')} title="Change cover photo" className="bottom-3 right-3 opacity-0 group-hover:opacity-100" />
+          <HoverPhotoEdit onClick={() => setHeaderModal('cover')} title="Change cover photo" className="bottom-3 right-3 z-10 opacity-0 group-hover:opacity-100" />
 
           <div className="relative flex flex-col gap-3 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -174,13 +179,17 @@ export default function ProjectDetailPage() {
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">Price</p>
                 <p className="font-bold text-gray-900">{priceLabel}</p>
-                <p className="text-[10px] text-gray-400">{isVillaProject ? 'Set per villa' : 'Set per tower'}</p>
+                <p className="text-[10px] text-gray-400">{isPlotProject ? 'Set per plot' : isVillaProject ? 'Set per villa' : isCommercialProject ? 'Set per unit' : 'Set per tower'}</p>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">{isVillaProject ? '🏡 Add Villa' : '🏠 Add Unit'}</Link>
-              {!isVillaProject && (
+              {isPlotProject ? (
+                <button type="button" onClick={() => { setTab('inventory'); setAddUnitRequested(true) }} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">📍 Add Plot</button>
+              ) : (
+                <Link to={`/projects/${id}/units/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">{isVillaProject ? '🏡 Add Villa' : isCommercialProject ? '🏬 Add Commercial' : '🏠 Add Unit'}</Link>
+              )}
+              {hasTowers && (
                 <Link to={`/projects/${id}/towers/add`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">🏢 Add Tower</Link>
               )}
               <Link to={`/leads/add?project=${id}`} className="text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 shadow-sm">👤 Add Lead</Link>
@@ -227,7 +236,7 @@ export default function ProjectDetailPage() {
           />
         )}
         {tab === 'towers' && <TowersTab id={id} project={project} units={units} towers={towers} />}
-        {tab === 'inventory' && <InventoryTab id={id} project={project} units={units} onUnitsChanged={refetchUnits} />}
+        {tab === 'inventory' && <InventoryTab id={id} project={project} units={units} onUnitsChanged={refetchUnits} addUnitRequested={addUnitRequested} onAddUnitRequestHandled={() => setAddUnitRequested(false)} />}
         {tab === 'documents' && <DocumentsTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
         {tab === 'gallery' && <GalleryTab id={id} project={project} onProjectChanged={handleProjectChanged} />}
         {tab === 'activity' && <ActivityTab units={units} bookings={bookings} payments={payments} userById={userById} />}

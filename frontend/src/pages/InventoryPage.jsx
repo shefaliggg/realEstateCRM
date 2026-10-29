@@ -77,6 +77,7 @@ export default function InventoryPage() {
   const blocks = [...new Set(typeUnits.map((u) => u.block).filter(Boolean))].sort()
   const bhkTypes = [...new Set(typeUnits.map((u) => u.bhkType).filter(Boolean))].sort()
   const totalLabel = activeType === 'Plots' ? 'plots' : 'units'
+  const isCommercial = activeType === 'Commercial'
 
   return (
           <div className="p-6">
@@ -132,14 +133,14 @@ export default function InventoryPage() {
           </select>
           {activeType !== 'Plots' && (
             <>
-              <select value={blockFilter} onChange={e => setBlockFilter(e.target.value)}
+              {!isCommercial && <select value={blockFilter} onChange={e => setBlockFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
                 <option value="All">All Towers</option>
                 {blocks.map(b => <option key={b} value={b}>Tower {b}</option>)}
-              </select>
+              </select>}
               <select value={bhkFilter} onChange={e => setBhkFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300">
-                <option value="All">All BHK</option>
+                <option value="All">{isCommercial ? 'All Unit Types' : 'All BHK'}</option>
                 {bhkTypes.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </>
@@ -157,7 +158,7 @@ export default function InventoryPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">{activeType === 'Plots' ? 'Plot' : 'Unit'}</th>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">Project</th>
-                  {activeType !== 'Plots' && <th className="text-left px-4 py-3 text-gray-600 font-medium">BHK</th>}
+                  {activeType !== 'Plots' && <th className="text-left px-4 py-3 text-gray-600 font-medium">{isCommercial ? 'Unit Type' : 'BHK'}</th>}
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">{activeType === 'Plots' ? 'Plot Area' : 'Area'}</th>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">Base Price</th>
                   <th className="text-left px-4 py-3 text-gray-600 font-medium">Status</th>
@@ -173,6 +174,11 @@ export default function InventoryPage() {
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {activeType === 'Plots' ? (
                         <>Plot {u.unitNo}</>
+                      ) : isCommercial ? (
+                        <>
+                          Unit {u.unitNo}&nbsp;
+                          <span className="text-xs text-gray-400">{Number(u.floor) === 0 ? 'Ground' : `F${u.floor}`}</span>
+                        </>
                       ) : (
                         <>
                           Tower {u.block} – {u.unitNo}&nbsp;

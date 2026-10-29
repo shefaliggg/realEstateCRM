@@ -1,8 +1,16 @@
 import { Link } from 'react-router-dom'
 import TowerCard from './TowerCard'
+import { unitCategory } from './shared'
 
 export default function TowersTab({ id, project, units, towers }) {
+  const isMixedUseProject = project.type === 'Mixed Use'
   const towerByName = new Map((towers || []).map((t) => [t.name, t]))
+  // Residential vs commercial split per tower, only shown for mixed use projects
+  const categorySplit = (name) => {
+    const towerUnits = units.filter((u) => u.block === name)
+    const commercial = towerUnits.filter((u) => unitCategory(u) === 'Commercial').length
+    return { residential: towerUnits.length - commercial, commercial }
+  }
   const blockNames = [...new Set([...(project.blocks || []), ...units.map((u) => u.block)])]
   const towerCards = blockNames.map((name) => {
     const real = towerByName.get(name)
@@ -38,7 +46,7 @@ export default function TowersTab({ id, project, units, towers }) {
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {towerCards.map((tower) => (
-            <TowerCard key={tower.name} id={id} tower={tower} />
+            <TowerCard key={tower.name} id={id} tower={tower} categorySplit={isMixedUseProject ? categorySplit(tower.name) : null} />
           ))}
         </div>
       )}

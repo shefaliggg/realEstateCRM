@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
-import { amenityIcon } from './projectDetail/shared'
+import { amenityIcon, unitCategory } from './projectDetail/shared'
 import { EditPencilButton, Modal } from './projectDetail/editShared'
 import { EditTowerAmenitiesModal, EditTowerSpecificationsModal } from './projectDetail/towerEditModals'
 import { EditUnitModal } from './projectDetail/unitEditModals'
 import BulkCreateFlatsPanel from './projectDetail/BulkCreateFlatsPanel'
+import AddUnitModal from './projectDetail/AddUnitModal'
+import AddCommercialModal from './projectDetail/AddCommercialModal'
 
 const STATUS_COLORS = {
   Available: 'bg-green-100 text-green-700 border-green-200',
@@ -31,8 +33,9 @@ function formatPrice(v) {
   return `₹${n.toLocaleString('en-IN')}`
 }
 
-function FlatCard({ unit, onEdit }) {
+function FlatCard({ unit, onEdit, isMixedUseProject = false }) {
   const price = unit.totalPrice || unit.basePrice
+  const isCommercialUnit = isMixedUseProject && unitCategory(unit) === 'Commercial'
   const handleEdit = (e) => {
     e.preventDefault()
     e.stopPropagation()
@@ -45,8 +48,15 @@ function FlatCard({ unit, onEdit }) {
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <h4 className="font-semibold text-gray-900 truncate">Flat {unit.unitNo}</h4>
-          <p className="text-xs text-gray-400">Floor {unit.floor} · {unit.bhkType}{unit.cornerUnit ? ' · Corner' : ''}</p>
+          <h4 className="font-semibold text-gray-900 truncate">
+            {isCommercialUnit ? 'Unit' : 'Flat'} {unit.unitNo}
+            {isMixedUseProject && (
+              <span className={`ml-1.5 align-middle text-[10px] font-medium px-1.5 py-0.5 rounded ${isCommercialUnit ? 'bg-amber-50 text-amber-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                {isCommercialUnit ? 'Commercial' : 'Residential'}
+              </span>
+            )}
+          </h4>
+          <p className="text-xs text-gray-400">Floor {isCommercialUnit && Number(unit.floor) === 0 ? 'Ground' : unit.floor} · {unit.bhkType}{unit.cornerUnit ? ' · Corner' : ''}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${STATUS_COLORS[unit.status] || 'bg-gray-100 text-gray-600'}`}>
@@ -62,7 +72,7 @@ function FlatCard({ unit, onEdit }) {
         <span className="font-bold text-gray-900">{price ? formatPrice(price) : 'Price TBD'}</span>
       </div>
       <div className="flex items-center justify-between text-xs text-gray-400">
-        <span>Facing {unit.facing || '—'}</span>
+        <span>{isCommercialUnit && unit.frontage ? `Frontage ${unit.frontage} ft` : `Facing ${unit.facing || '—'}`}</span>
         <span>Parking {unit.parkingNumber || (unit.parkingIncluded ? 'Included' : '—')}</span>
       </div>
     </Link>
@@ -79,6 +89,8 @@ export default function BlockPage() {
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [bhkFilter, setBhkFilter] = useState('All')
+  const [categoryFilter, setCategoryFilter] = useState('All')
+  const [addUnitCategory, setAddUnitCategory] = useState(null)
   const [view, setView] = useState('cards')
   const [towerModal, setTowerModal] = useState(null)
   const [tab, setTab] = useState('details')
@@ -126,6 +138,7 @@ export default function BlockPage() {
   const filtered = units.filter(u => {
     if (statusFilter !== 'All' && u.status !== statusFilter) return false
     if (bhkFilter !== 'All' && u.bhkType !== bhkFilter) return false
+    if (categoryFilter !== 'All' && unitCategory(u) !== categoryFilter) return false
     return true
   })
 
@@ -137,7 +150,12 @@ export default function BlockPage() {
     reserved: units.filter(u => u.status === 'Reserved').length,
     booked: units.filter(u => u.status === 'Booked').length,
     registered: units.filter(u => u.status === 'Registered').length,
+    commercial: units.filter(u => unitCategory(u) === 'Commercial').length,
   }
+
+  // Mixed use towers hold both flats and commercial units (shops, offices) on their floors
+  const isMixedUseProject = project?.type === 'Mixed Use'
+  const unitWord = isMixedUseProject ? 'unit' : 'flat'
 
   if (loading) return <div className="p-6 text-gray-400">Loading...</div>
   if (error) return <div className="p-6 text-red-500">{error}</div>
@@ -158,13 +176,32 @@ export default function BlockPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tower {block}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            + Add Flat
-          </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {isMixedUseProject ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setAddUnitCategory('Residential')}
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                + Add Flat
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddUnitCategory('Commercial')}
+                className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                + Add Commercial
+              </button>
+            </>
+          ) : (
+            <Link
+              to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Flat
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => setShowBulkAdd(true)}
@@ -185,11 +222,30 @@ export default function BlockPage() {
         </Modal>
       )}
 
+      {addUnitCategory === 'Residential' && (
+        <AddUnitModal
+          projectId={projectId}
+          project={project}
+          block={block}
+          onClose={() => setAddUnitCategory(null)}
+          onCreated={refetchUnits}
+        />
+      )}
+      {addUnitCategory === 'Commercial' && (
+        <AddCommercialModal
+          projectId={projectId}
+          project={project}
+          block={block}
+          onClose={() => setAddUnitCategory(null)}
+          onCreated={refetchUnits}
+        />
+      )}
+
       {/* Tabs */}
       <div className="flex flex-wrap border-b border-gray-200 mb-5">
         {[
           { key: 'details', label: 'Details' },
-          { key: 'flats', label: 'Flat List' },
+          { key: 'flats', label: isMixedUseProject ? 'Unit List' : 'Flat List' },
         ].map(({ key, label }) => (
           <button
             key={key}
@@ -213,6 +269,10 @@ export default function BlockPage() {
           { label: 'Reserved', val: stats.reserved, color: 'bg-yellow-100 text-yellow-700' },
           { label: 'Booked', val: stats.booked, color: 'bg-orange-100 text-orange-700' },
           { label: 'Registered', val: stats.registered, color: 'bg-blue-100 text-blue-700' },
+          ...(isMixedUseProject ? [
+            { label: 'Residential', val: stats.total - stats.commercial, color: 'bg-indigo-50 text-indigo-700' },
+            { label: 'Commercial', val: stats.commercial, color: 'bg-amber-50 text-amber-700' },
+          ] : []),
         ].map(s => (
           <div key={s.label} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${s.color}`}>
             {s.label}: <span className="font-bold">{s.val}</span>
@@ -333,10 +393,21 @@ export default function BlockPage() {
           onChange={e => setBhkFilter(e.target.value)}
           className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
         >
-          <option value="All">All BHK</option>
+          <option value="All">{isMixedUseProject ? 'All Unit Types' : 'All BHK'}</option>
           {project?.bhkTypes?.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
-        <span className="text-sm text-gray-400">{filtered.length} flat{filtered.length !== 1 ? 's' : ''}</span>
+        {isMixedUseProject && (
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-300"
+          >
+            <option value="All">All Categories</option>
+            <option value="Residential">Residential</option>
+            <option value="Commercial">Commercial</option>
+          </select>
+        )}
+        <span className="text-sm text-gray-400">{filtered.length} {unitWord}{filtered.length !== 1 ? 's' : ''}</span>
 
         <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-lg p-1">
           <button
@@ -368,17 +439,30 @@ export default function BlockPage() {
       {units.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-100 shadow-sm">
           <p className="text-4xl mb-3">🏢</p>
-          <p className="text-gray-600 font-medium mb-1">No flats in Tower {block} yet</p>
-          <p className="text-sm text-gray-400 mb-5">Start adding flats to build your inventory</p>
-          <Link
-            to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors inline-block"
-          >
-            + Add First Flat
-          </Link>
+          <p className="text-gray-600 font-medium mb-1">No {unitWord}s in Tower {block} yet</p>
+          <p className="text-sm text-gray-400 mb-5">
+            {isMixedUseProject ? 'Start adding flats and commercial units to build your inventory' : 'Start adding flats to build your inventory'}
+          </p>
+          {isMixedUseProject ? (
+            <div className="flex flex-wrap justify-center gap-2">
+              <button type="button" onClick={() => setAddUnitCategory('Residential')} className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                + Add First Flat
+              </button>
+              <button type="button" onClick={() => setAddUnitCategory('Commercial')} className="border border-gray-200 hover:bg-gray-50 text-gray-700 px-5 py-2 rounded-lg text-sm font-medium transition-colors">
+                + Add Commercial Unit
+              </button>
+            </div>
+          ) : (
+            <Link
+              to={`/projects/${projectId}/units/add?block=${encodeURIComponent(block)}`}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors inline-block"
+            >
+              + Add First Flat
+            </Link>
+          )}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-10 text-gray-400 text-sm">No flats match the selected filters.</div>
+        <div className="text-center py-10 text-gray-400 text-sm">No {unitWord}s match the selected filters.</div>
       ) : view === 'cards' ? (
         <div className="space-y-5">
           {floors.map(floor => (
@@ -388,7 +472,7 @@ export default function BlockPage() {
                 {filtered
                   .filter(u => u.floor === floor)
                   .sort((a, b) => String(a.unitNo).localeCompare(String(b.unitNo), undefined, { numeric: true }))
-                  .map(u => <FlatCard key={u._id} unit={u} onEdit={setEditingUnit} />)}
+                  .map(u => <FlatCard key={u._id} unit={u} onEdit={setEditingUnit} isMixedUseProject={isMixedUseProject} />)}
               </div>
             </div>
           ))}

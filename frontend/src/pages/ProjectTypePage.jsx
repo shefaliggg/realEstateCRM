@@ -138,7 +138,7 @@ function CardView({ projects }) {
 
               <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
                 <p className="text-xs text-gray-500">
-                  {totalUnits || '—'} villas · Poss. {possessionDate}
+                  {totalUnits || '—'} {project.type === 'Plots' ? 'plots' : project.type === 'Villas' ? 'villas' : 'units'} · Poss. {possessionDate}
                 </p>
                 {team.length > 0 && (
                   <div className="flex -space-x-1.5 shrink-0">
@@ -320,33 +320,26 @@ function VillaAddModal({ open, onClose, onCreated }) {
         numberOfFloors: Number(form.numberOfFloors) || undefined,
         bhkTypes: form.bhkTypes,
         amenities: form.amenities,
-        pricing: {
-          priceStart: Number(form.priceStart) || undefined,
-          priceEnd: Number(form.priceEnd) || undefined,
-          basePricePerSqft: Number(form.basePricePerSqft) || undefined,
-        },
-        location: {
-          country: form.country || 'India',
-          state: form.state,
-          city: form.city,
-          locality: form.locality,
-          address: form.address,
-          landmark: form.landmark,
-          pincode: form.pincode,
-          googleMapLink: form.googleMapLink,
-        },
-        salesInfo: {
-          bookingOpen: !!form.bookingOpen,
-          salesOfficeAddress: form.salesOfficeAddress,
-          siteOfficeContact: form.siteOfficeContact,
-          crmNotes: form.crmNotes,
-        },
-        contact: {
-          salesPhone: form.salesPhone,
-          whatsapp: form.whatsapp,
-          email: form.email,
-          website: form.website,
-        },
+        // The API reads location / pricing / sales / contact as flat fields, not nested objects
+        priceStart: Number(form.priceStart) || undefined,
+        priceEnd: Number(form.priceEnd) || undefined,
+        basePricePerSqft: Number(form.basePricePerSqft) || undefined,
+        country: form.country || 'India',
+        state: form.state,
+        city: form.city,
+        locality: form.locality,
+        address: form.address,
+        landmark: form.landmark,
+        pincode: form.pincode,
+        googleMapLink: form.googleMapLink,
+        bookingOpen: !!form.bookingOpen,
+        salesOfficeAddress: form.salesOfficeAddress,
+        siteOfficeContact: form.siteOfficeContact,
+        crmNotes: form.crmNotes,
+        salesPhone: form.salesPhone,
+        whatsapp: form.whatsapp,
+        email: form.email,
+        website: form.website,
       }
 
       await api.post('/projects', payload)
@@ -590,6 +583,1042 @@ function VillaAddModal({ open, onClose, onCreated }) {
   )
 }
 
+const INITIAL_PLOT_FORM = {
+  name: '',
+  code: '',
+  developerName: '',
+  status: 'Pre-Launch',
+  reraNo: '',
+  description: '',
+  country: 'India',
+  state: '',
+  city: '',
+  locality: '',
+  address: '',
+  landmark: '',
+  pincode: '',
+  googleMapLink: '',
+  totalUnits: '',
+  totalLandArea: '',
+  totalBlocks: '',
+  plotSizes: ['1200 sq.ft', '1500 sq.ft'],
+  launchDate: '',
+  possessionDate: '',
+  priceStart: '',
+  priceEnd: '',
+  basePricePerSqft: '',
+  amenities: ['Gated community', 'Internal roads', 'Water supply', 'Electricity'],
+  bookingOpen: true,
+  salesPhone: '',
+  whatsapp: '',
+  email: '',
+  website: '',
+  salesOfficeAddress: '',
+  crmNotes: '',
+}
+
+const PLOT_AMENITIES = ['Gated community', 'Internal roads', 'Water supply', 'Electricity', 'Drainage', 'Street lights', 'Compound wall', 'Security', 'Park / Garden', 'Clubhouse', 'Children play area', 'CCTV']
+const PLOT_SIZE_OPTIONS = ['600 sq.ft', '1000 sq.ft', '1200 sq.ft', '1500 sq.ft', '2000 sq.ft', '2400 sq.ft', '3000 sq.ft', '4000+ sq.ft']
+const PLOT_STEPS = ['Basic', 'Location', 'Plot details', 'Sales']
+
+// Required fields per step, used for validation and the * marker
+const PLOT_REQUIRED = {
+  0: { name: 'Project name', developerName: 'Developer / Builder', status: 'Status' },
+  1: { state: 'State', city: 'City', locality: 'Locality', address: 'Address' },
+  2: { totalUnits: 'Total plots', totalLandArea: 'Total land area', priceStart: 'Starting price', basePricePerSqft: 'Base price / sq.ft' },
+  3: { salesPhone: 'Sales phone' },
+}
+
+const FORM_INPUT_CLASS = 'w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
+
+function PlotAddModal({ open, onClose, onCreated }) {
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState(INITIAL_PLOT_FORM)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setStep(0)
+    setForm(INITIAL_PLOT_FORM)
+    setError('')
+    setFieldErrors({})
+    setSaving(false)
+  }, [open])
+
+  if (!open) return null
+
+  const updateField = (field) => (event) => {
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const toggleListItem = (field, item) => {
+    setForm((prev) => {
+      const current = prev[field] || []
+      return {
+        ...prev,
+        [field]: current.includes(item) ? current.filter((value) => value !== item) : [...current, item],
+      }
+    })
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const validateStep = (index) => {
+    const errors = {}
+    Object.entries(PLOT_REQUIRED[index] || {}).forEach(([field, label]) => {
+      if (!String(form[field] ?? '').trim()) errors[field] = `${label} is required.`
+    })
+
+    if (index === 1 && form.pincode && !/^\d{6}$/.test(form.pincode.trim())) {
+      errors.pincode = 'Pincode must be 6 digits.'
+    }
+    if (index === 2) {
+      if (form.totalUnits && Number(form.totalUnits) <= 0) errors.totalUnits = 'Total plots must be greater than 0.'
+      if (form.priceStart && Number(form.priceStart) <= 0) errors.priceStart = 'Starting price must be greater than 0.'
+      if (form.basePricePerSqft && Number(form.basePricePerSqft) <= 0) errors.basePricePerSqft = 'Base price must be greater than 0.'
+      if (form.priceEnd && Number(form.priceEnd) < Number(form.priceStart)) errors.priceEnd = 'Ending price cannot be less than starting price.'
+      if (form.launchDate && form.possessionDate && form.possessionDate < form.launchDate) errors.possessionDate = 'Possession date cannot be before launch date.'
+      if (!form.plotSizes.length) errors.plotSizes = 'Select at least one plot size.'
+    }
+    if (index === 3) {
+      if (form.salesPhone && !/^\+?[\d\s-]{10,15}$/.test(form.salesPhone.trim())) errors.salesPhone = 'Enter a valid phone number.'
+      if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.'
+    }
+
+    setFieldErrors(errors)
+    const messages = Object.values(errors)
+    setError(messages.length ? messages[0] : '')
+    return messages.length === 0
+  }
+
+  const nextStep = () => {
+    if (!validateStep(step)) return
+    setStep((prev) => Math.min(prev + 1, PLOT_STEPS.length - 1))
+  }
+
+  const prevStep = () => {
+    setError('')
+    setFieldErrors({})
+    setStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const submitForm = async () => {
+    if (!validateStep(step)) return
+    setSaving(true)
+    setError('')
+
+    try {
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        developerName: form.developerName.trim(),
+        description: form.description.trim(),
+        type: 'Plots',
+        status: form.status,
+        reraNo: form.reraNo.trim(),
+        launchDate: form.launchDate || '',
+        possessionDate: form.possessionDate || '',
+        totalLandArea: form.totalLandArea.trim(),
+        totalUnits: Number(form.totalUnits) || undefined,
+        totalBlocks: Number(form.totalBlocks) || undefined,
+        bhkTypes: form.plotSizes,
+        amenities: form.amenities,
+        // The API reads location / pricing / sales / contact as flat fields, not nested objects
+        priceStart: Number(form.priceStart) || undefined,
+        priceEnd: Number(form.priceEnd) || undefined,
+        basePricePerSqft: Number(form.basePricePerSqft) || undefined,
+        country: form.country || 'India',
+        state: form.state.trim(),
+        city: form.city.trim(),
+        locality: form.locality.trim(),
+        address: form.address.trim(),
+        landmark: form.landmark.trim(),
+        pincode: form.pincode.trim(),
+        googleMapLink: form.googleMapLink.trim(),
+        bookingOpen: !!form.bookingOpen,
+        salesOfficeAddress: form.salesOfficeAddress,
+        crmNotes: form.crmNotes,
+        salesPhone: form.salesPhone.trim(),
+        whatsapp: form.whatsapp.trim(),
+        email: form.email.trim(),
+        website: form.website.trim(),
+      }
+
+      await api.post('/projects', payload)
+      onCreated?.()
+      onClose()
+    } catch (submitError) {
+      setError(submitError?.response?.data?.message || 'Failed to create plot project.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isRequired = (field) => Object.values(PLOT_REQUIRED).some((fields) => field in fields)
+
+  const field = (name, label, { type = 'text', placeholder = '', span = '', options } = {}) => (
+    <div className={span}>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}{isRequired(name) && <span className="text-red-500"> *</span>}
+      </label>
+      {options ? (
+        <select value={form[name]} onChange={updateField(name)} className={`${FORM_INPUT_CLASS} text-gray-700 ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`}>
+          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea rows="3" value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      ) : (
+        <input type={type} value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      )}
+      {fieldErrors[name] && <p className="mt-1 text-xs text-red-600">{fieldErrors[name]}</p>}
+    </div>
+  )
+
+  const stepContent = () => {
+    if (step === 0) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('name', 'Project name', { placeholder: 'Green Meadows Plots', span: 'md:col-span-2' })}
+          {field('code', 'Project code', { placeholder: 'GMP-01' })}
+          {field('developerName', 'Developer / Builder', { placeholder: 'Green Valley Developers' })}
+          {field('status', 'Status', { options: PROJECT_STATUS_OPTIONS })}
+          {field('reraNo', 'RERA number', { placeholder: 'P-1234/2024' })}
+          {field('description', 'Description', { type: 'textarea', span: 'md:col-span-2', placeholder: 'NA-approved residential plots with clear title, wide internal roads and gated security.' })}
+        </div>
+      )
+    }
+
+    if (step === 1) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('state', 'State', { placeholder: 'Maharashtra' })}
+          {field('city', 'City', { placeholder: 'Pune' })}
+          {field('locality', 'Locality', { placeholder: 'Hinjewadi' })}
+          {field('pincode', 'Pincode', { placeholder: '411057' })}
+          {field('address', 'Address', { span: 'md:col-span-2', placeholder: 'Survey No. 45, near XYZ Road' })}
+          {field('landmark', 'Landmark', { placeholder: 'Near Phase 3 IT Park' })}
+          {field('googleMapLink', 'Google map link', { placeholder: 'https://maps.google.com/...' })}
+        </div>
+      )
+    }
+
+    if (step === 2) {
+      return (
+        <div className="space-y-4">
+          <div className="mb-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs text-primary-700">
+            This project contains open plots, not towers or villas.
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {field('totalUnits', 'Total plots', { type: 'number', placeholder: '120' })}
+            {field('totalLandArea', 'Total land area', { placeholder: '12 acres' })}
+            {field('totalBlocks', 'Phases / sectors', { type: 'number', placeholder: '3' })}
+            {field('priceStart', 'Starting price', { type: 'number', placeholder: '2500000' })}
+            {field('priceEnd', 'Ending price', { type: 'number', placeholder: '6000000' })}
+            {field('basePricePerSqft', 'Base price / sq.ft', { type: 'number', placeholder: '2100' })}
+            {field('launchDate', 'Launch date', { type: 'date' })}
+            {field('possessionDate', 'Possession date', { type: 'date' })}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Plot sizes<span className="text-red-500"> *</span></label>
+            <div className="flex flex-wrap gap-2">
+              {PLOT_SIZE_OPTIONS.map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  onClick={() => toggleListItem('plotSizes', option)}
+                  className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${form.plotSizes.includes(option) ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            {fieldErrors.plotSizes && <p className="mt-1 text-xs text-red-600">{fieldErrors.plotSizes}</p>}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Amenities</label>
+            <div className="flex flex-wrap gap-2">
+              {PLOT_AMENITIES.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  onClick={() => toggleListItem('amenities', item)}
+                  className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${form.amenities.includes(item) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 md:col-span-2">
+          <input type="checkbox" checked={form.bookingOpen} onChange={updateField('bookingOpen')} className="h-4 w-4 text-primary-600" />
+          Booking open
+        </label>
+        {field('salesPhone', 'Sales phone', { placeholder: '+91 98765 43210' })}
+        {field('whatsapp', 'WhatsApp', { placeholder: '+91 98765 43210' })}
+        {field('email', 'Email', { type: 'email', placeholder: 'sales@company.com' })}
+        {field('website', 'Website', { placeholder: 'https://example.com' })}
+        {field('salesOfficeAddress', 'Sales office address', { span: 'md:col-span-2', placeholder: 'Site office, Hinjewadi, Pune' })}
+        {field('crmNotes', 'CRM notes', { type: 'textarea', span: 'md:col-span-2', placeholder: 'Add notes for sales / marketing team' })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-200">
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary-600 font-semibold">New plot project</p>
+            <h2 className="text-xl font-bold text-gray-900">Add plot project</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600">×</button>
+        </div>
+
+        <div className="px-6 py-4">
+          <div className="mb-6 flex items-center gap-3">
+            {PLOT_STEPS.map((label, index) => (
+              <div key={label} className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index <= step ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {index + 1}
+                </div>
+                <span className={`hidden sm:inline text-xs font-medium ${index <= step ? 'text-gray-800' : 'text-gray-400'}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mb-3 text-xs text-gray-400">Fields marked <span className="text-red-500">*</span> are required.</p>
+          {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {stepContent()}
+        </div>
+
+        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          <div className="flex items-center gap-2">
+            {step > 0 && (
+              <button type="button" onClick={prevStep} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+            )}
+            {step < PLOT_STEPS.length - 1 ? (
+              <button type="button" onClick={nextStep} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">Next</button>
+            ) : (
+              <button type="button" onClick={submitForm} disabled={saving} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60">
+                {saving ? 'Saving...' : 'Create plot project'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const INITIAL_COMMERCIAL_FORM = {
+  name: '',
+  code: '',
+  developerName: '',
+  status: 'Pre-Launch',
+  reraNo: '',
+  description: '',
+  country: 'India',
+  state: '',
+  city: '',
+  locality: '',
+  address: '',
+  landmark: '',
+  pincode: '',
+  googleMapLink: '',
+  totalUnits: '',
+  numberOfFloors: '',
+  totalLandArea: '',
+  unitTypes: ['Office space', 'Retail shop'],
+  launchDate: '',
+  possessionDate: '',
+  priceStart: '',
+  priceEnd: '',
+  basePricePerSqft: '',
+  parkingCharges: '',
+  gstApplicable: true,
+  amenities: ['Power backup', 'Lifts', 'Security', 'Parking'],
+  bookingOpen: true,
+  bankLoanAvailable: false,
+  salesPhone: '',
+  whatsapp: '',
+  email: '',
+  website: '',
+  salesOfficeAddress: '',
+  crmNotes: '',
+}
+
+const COMMERCIAL_UNIT_TYPES = ['Office space', 'Retail shop', 'Showroom', 'Food court', 'Restaurant', 'Co-working', 'Warehouse', 'Anchor store']
+const COMMERCIAL_AMENITIES = ['Power backup', 'Lifts', 'Security', 'Parking', 'Central AC', 'Fire safety', 'CCTV', 'Visitor parking', 'Food court', 'Conference room', 'High-speed internet', 'Washrooms']
+const COMMERCIAL_STEPS = ['Basic', 'Location', 'Commercial details', 'Sales']
+
+// Required fields per step, used for validation and the * marker
+const COMMERCIAL_REQUIRED = {
+  0: { name: 'Project name', developerName: 'Developer / Builder', status: 'Status' },
+  1: { state: 'State', city: 'City', locality: 'Locality', address: 'Address' },
+  2: { totalUnits: 'Total units', numberOfFloors: 'Total floors', totalLandArea: 'Built-up area', priceStart: 'Starting price', basePricePerSqft: 'Base price / sq.ft' },
+  3: { salesPhone: 'Sales phone' },
+}
+
+function CommercialAddModal({ open, onClose, onCreated }) {
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState(INITIAL_COMMERCIAL_FORM)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setStep(0)
+    setForm(INITIAL_COMMERCIAL_FORM)
+    setError('')
+    setFieldErrors({})
+    setSaving(false)
+  }, [open])
+
+  if (!open) return null
+
+  const updateField = (field) => (event) => {
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const toggleListItem = (field, item) => {
+    setForm((prev) => {
+      const current = prev[field] || []
+      return {
+        ...prev,
+        [field]: current.includes(item) ? current.filter((value) => value !== item) : [...current, item],
+      }
+    })
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const validateStep = (index) => {
+    const errors = {}
+    Object.entries(COMMERCIAL_REQUIRED[index] || {}).forEach(([field, label]) => {
+      if (!String(form[field] ?? '').trim()) errors[field] = `${label} is required.`
+    })
+
+    if (index === 1 && form.pincode && !/^\d{6}$/.test(form.pincode.trim())) {
+      errors.pincode = 'Pincode must be 6 digits.'
+    }
+    if (index === 2) {
+      if (form.totalUnits && Number(form.totalUnits) <= 0) errors.totalUnits = 'Total units must be greater than 0.'
+      if (form.numberOfFloors && Number(form.numberOfFloors) <= 0) errors.numberOfFloors = 'Total floors must be greater than 0.'
+      if (form.priceStart && Number(form.priceStart) <= 0) errors.priceStart = 'Starting price must be greater than 0.'
+      if (form.basePricePerSqft && Number(form.basePricePerSqft) <= 0) errors.basePricePerSqft = 'Base price must be greater than 0.'
+      if (form.priceEnd && Number(form.priceEnd) < Number(form.priceStart)) errors.priceEnd = 'Ending price cannot be less than starting price.'
+      if (form.parkingCharges && Number(form.parkingCharges) < 0) errors.parkingCharges = 'Parking charges cannot be negative.'
+      if (form.launchDate && form.possessionDate && form.possessionDate < form.launchDate) errors.possessionDate = 'Possession date cannot be before launch date.'
+      if (!form.unitTypes.length) errors.unitTypes = 'Select at least one unit type.'
+    }
+    if (index === 3) {
+      if (form.salesPhone && !/^\+?[\d\s-]{10,15}$/.test(form.salesPhone.trim())) errors.salesPhone = 'Enter a valid phone number.'
+      if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.'
+    }
+
+    setFieldErrors(errors)
+    const messages = Object.values(errors)
+    setError(messages.length ? messages[0] : '')
+    return messages.length === 0
+  }
+
+  const nextStep = () => {
+    if (!validateStep(step)) return
+    setStep((prev) => Math.min(prev + 1, COMMERCIAL_STEPS.length - 1))
+  }
+
+  const prevStep = () => {
+    setError('')
+    setFieldErrors({})
+    setStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const submitForm = async () => {
+    if (!validateStep(step)) return
+    setSaving(true)
+    setError('')
+
+    try {
+      // The projects API reads flat fields and groups them into location / pricing / salesInfo / contact
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        developerName: form.developerName.trim(),
+        description: form.description.trim(),
+        type: 'Commercial',
+        status: form.status,
+        reraNo: form.reraNo.trim(),
+        launchDate: form.launchDate || undefined,
+        possessionDate: form.possessionDate || undefined,
+        totalLandArea: form.totalLandArea.trim(),
+        totalUnits: form.totalUnits,
+        numberOfFloors: form.numberOfFloors,
+        bhkTypes: form.unitTypes,
+        amenities: form.amenities,
+        priceStart: form.priceStart,
+        priceEnd: form.priceEnd || undefined,
+        basePricePerSqft: form.basePricePerSqft,
+        parkingCharges: form.parkingCharges || undefined,
+        gstApplicable: !!form.gstApplicable,
+        country: form.country || 'India',
+        state: form.state.trim(),
+        city: form.city.trim(),
+        locality: form.locality.trim(),
+        address: form.address.trim(),
+        landmark: form.landmark.trim(),
+        pincode: form.pincode.trim(),
+        googleMapLink: form.googleMapLink.trim(),
+        bookingOpen: !!form.bookingOpen,
+        bankLoanAvailable: !!form.bankLoanAvailable,
+        salesOfficeAddress: form.salesOfficeAddress.trim(),
+        crmNotes: form.crmNotes.trim(),
+        salesPhone: form.salesPhone.trim(),
+        whatsapp: form.whatsapp.trim(),
+        email: form.email.trim(),
+        website: form.website.trim(),
+      }
+
+      await api.post('/projects', payload)
+      onCreated?.()
+      onClose()
+    } catch (submitError) {
+      setError(submitError?.response?.data?.message || 'Failed to create commercial project.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isRequired = (field) => Object.values(COMMERCIAL_REQUIRED).some((fields) => field in fields)
+
+  const field = (name, label, { type = 'text', placeholder = '', span = '', options } = {}) => (
+    <div className={span}>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}{isRequired(name) && <span className="text-red-500"> *</span>}
+      </label>
+      {options ? (
+        <select value={form[name]} onChange={updateField(name)} className={`${FORM_INPUT_CLASS} text-gray-700 ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`}>
+          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea rows="3" value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      ) : (
+        <input type={type} value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      )}
+      {fieldErrors[name] && <p className="mt-1 text-xs text-red-600">{fieldErrors[name]}</p>}
+    </div>
+  )
+
+  const chipGroup = (name, label, items, activeClass, required = false) => (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}{required && <span className="text-red-500"> *</span>}
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <button
+            type="button"
+            key={item}
+            onClick={() => toggleListItem(name, item)}
+            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${form[name].includes(item) ? activeClass : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      {fieldErrors[name] && <p className="mt-1 text-xs text-red-600">{fieldErrors[name]}</p>}
+    </div>
+  )
+
+  const stepContent = () => {
+    if (step === 0) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('name', 'Project name', { placeholder: 'Skyline Business Park', span: 'md:col-span-2' })}
+          {field('code', 'Project code', { placeholder: 'SBP-01' })}
+          {field('developerName', 'Developer / Builder', { placeholder: 'Skyline Developers' })}
+          {field('status', 'Status', { options: PROJECT_STATUS_OPTIONS })}
+          {field('reraNo', 'RERA number', { placeholder: 'P-1234/2024' })}
+          {field('description', 'Description', { type: 'textarea', span: 'md:col-span-2', placeholder: 'Grade-A commercial complex with office spaces, retail shops and ample parking.' })}
+        </div>
+      )
+    }
+
+    if (step === 1) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('state', 'State', { placeholder: 'Maharashtra' })}
+          {field('city', 'City', { placeholder: 'Pune' })}
+          {field('locality', 'Locality', { placeholder: 'Kharadi' })}
+          {field('pincode', 'Pincode', { placeholder: '411014' })}
+          {field('address', 'Address', { span: 'md:col-span-2', placeholder: 'Survey No. 12, Nagar Road' })}
+          {field('landmark', 'Landmark', { placeholder: 'Near EON IT Park' })}
+          {field('googleMapLink', 'Google map link', { placeholder: 'https://maps.google.com/...' })}
+        </div>
+      )
+    }
+
+    if (step === 2) {
+      return (
+        <div className="space-y-4">
+          <div className="mb-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs text-primary-700">
+            This project contains commercial units such as offices, shops and showrooms.
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {field('totalUnits', 'Total units', { type: 'number', placeholder: '150' })}
+            {field('numberOfFloors', 'Total floors', { type: 'number', placeholder: '12' })}
+            {field('totalLandArea', 'Built-up area', { placeholder: '2,50,000 sq.ft' })}
+            {field('launchDate', 'Launch date', { type: 'date' })}
+            {field('possessionDate', 'Possession date', { type: 'date' })}
+            {field('priceStart', 'Starting price', { type: 'number', placeholder: '4500000' })}
+            {field('priceEnd', 'Ending price', { type: 'number', placeholder: '30000000' })}
+            {field('basePricePerSqft', 'Base price / sq.ft', { type: 'number', placeholder: '9500' })}
+            {field('parkingCharges', 'Parking charges', { type: 'number', placeholder: '300000' })}
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input type="checkbox" checked={form.gstApplicable} onChange={updateField('gstApplicable')} className="h-4 w-4 text-primary-600" />
+            GST applicable
+          </label>
+          {chipGroup('unitTypes', 'Unit types', COMMERCIAL_UNIT_TYPES, 'bg-primary-600 text-white border-primary-600', true)}
+          {chipGroup('amenities', 'Amenities', COMMERCIAL_AMENITIES, 'bg-green-600 text-white border-green-600')}
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" checked={form.bookingOpen} onChange={updateField('bookingOpen')} className="h-4 w-4 text-primary-600" />
+          Booking open
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" checked={form.bankLoanAvailable} onChange={updateField('bankLoanAvailable')} className="h-4 w-4 text-primary-600" />
+          Bank loan available
+        </label>
+        {field('salesPhone', 'Sales phone', { placeholder: '+91 98765 43210' })}
+        {field('whatsapp', 'WhatsApp', { placeholder: '+91 98765 43210' })}
+        {field('email', 'Email', { type: 'email', placeholder: 'leasing@company.com' })}
+        {field('website', 'Website', { placeholder: 'https://example.com' })}
+        {field('salesOfficeAddress', 'Sales office address', { span: 'md:col-span-2', placeholder: 'Site office, Kharadi, Pune' })}
+        {field('crmNotes', 'CRM notes', { type: 'textarea', span: 'md:col-span-2', placeholder: 'Add notes for sales / leasing team' })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-200">
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary-600 font-semibold">New commercial project</p>
+            <h2 className="text-xl font-bold text-gray-900">Add commercial project</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600">×</button>
+        </div>
+
+        <div className="px-6 py-4">
+          <div className="mb-6 flex items-center gap-3">
+            {COMMERCIAL_STEPS.map((label, index) => (
+              <div key={label} className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index <= step ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {index + 1}
+                </div>
+                <span className={`hidden sm:inline text-xs font-medium ${index <= step ? 'text-gray-800' : 'text-gray-400'}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mb-3 text-xs text-gray-400">Fields marked <span className="text-red-500">*</span> are required.</p>
+          {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {stepContent()}
+        </div>
+
+        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          <div className="flex items-center gap-2">
+            {step > 0 && (
+              <button type="button" onClick={prevStep} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+            )}
+            {step < COMMERCIAL_STEPS.length - 1 ? (
+              <button type="button" onClick={nextStep} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">Next</button>
+            ) : (
+              <button type="button" onClick={submitForm} disabled={saving} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60">
+                {saving ? 'Saving...' : 'Create commercial project'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const INITIAL_MIXED_USE_FORM = {
+  name: '',
+  code: '',
+  developerName: '',
+  status: 'Pre-Launch',
+  reraNo: '',
+  description: '',
+  country: 'India',
+  state: '',
+  city: '',
+  locality: '',
+  address: '',
+  landmark: '',
+  pincode: '',
+  googleMapLink: '',
+  numberOfTowers: '',
+  numberOfFloors: '',
+  totalUnits: '',
+  totalLandArea: '',
+  residentialTypes: ['2 BHK', '3 BHK'],
+  commercialTypes: ['Retail shop'],
+  launchDate: '',
+  possessionDate: '',
+  priceStart: '',
+  priceEnd: '',
+  basePricePerSqft: '',
+  parkingCharges: '',
+  gstApplicable: true,
+  amenities: ['Power backup', 'Lifts', 'Security', 'Parking'],
+  bookingOpen: true,
+  bankLoanAvailable: true,
+  salesPhone: '',
+  whatsapp: '',
+  email: '',
+  website: '',
+  salesOfficeAddress: '',
+  crmNotes: '',
+}
+
+const MIXED_USE_RESIDENTIAL_TYPES = ['1 BHK', '2 BHK', '2.5 BHK', '3 BHK', '3.5 BHK', '4 BHK', 'Penthouse', 'Studio']
+const MIXED_USE_COMMERCIAL_TYPES = ['Office space', 'Retail shop', 'Showroom', 'Food court', 'Restaurant', 'Co-working']
+const MIXED_USE_AMENITIES = ['Power backup', 'Lifts', 'Security', 'Parking', 'Clubhouse', 'Swimming pool', 'Gym', 'Kids play area', 'CCTV', 'Fire safety', 'Visitor parking', 'Landscaped garden']
+const MIXED_USE_STEPS = ['Basic', 'Location', 'Project details', 'Sales']
+
+// Required fields per step, used for validation and the * marker
+const MIXED_USE_REQUIRED = {
+  0: { name: 'Project name', developerName: 'Developer / Builder', status: 'Status' },
+  1: { state: 'State', city: 'City', locality: 'Locality', address: 'Address' },
+  2: { numberOfTowers: 'Total towers', numberOfFloors: 'Total floors', totalUnits: 'Total units', totalLandArea: 'Land area', priceStart: 'Starting price', basePricePerSqft: 'Base price / sq.ft' },
+  3: { salesPhone: 'Sales phone' },
+}
+
+function MixedUseAddModal({ open, onClose, onCreated }) {
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState(INITIAL_MIXED_USE_FORM)
+  const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setStep(0)
+    setForm(INITIAL_MIXED_USE_FORM)
+    setError('')
+    setFieldErrors({})
+    setSaving(false)
+  }, [open])
+
+  if (!open) return null
+
+  const updateField = (field) => (event) => {
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value
+    setForm((prev) => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const toggleListItem = (field, item) => {
+    setForm((prev) => {
+      const current = prev[field] || []
+      return {
+        ...prev,
+        [field]: current.includes(item) ? current.filter((value) => value !== item) : [...current, item],
+      }
+    })
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: '' }))
+  }
+
+  const validateStep = (index) => {
+    const errors = {}
+    Object.entries(MIXED_USE_REQUIRED[index] || {}).forEach(([field, label]) => {
+      if (!String(form[field] ?? '').trim()) errors[field] = `${label} is required.`
+    })
+
+    if (index === 1 && form.pincode && !/^\d{6}$/.test(form.pincode.trim())) {
+      errors.pincode = 'Pincode must be 6 digits.'
+    }
+    if (index === 2) {
+      if (form.numberOfTowers && Number(form.numberOfTowers) <= 0) errors.numberOfTowers = 'Total towers must be greater than 0.'
+      if (form.numberOfFloors && Number(form.numberOfFloors) <= 0) errors.numberOfFloors = 'Total floors must be greater than 0.'
+      if (form.totalUnits && Number(form.totalUnits) <= 0) errors.totalUnits = 'Total units must be greater than 0.'
+      if (form.priceStart && Number(form.priceStart) <= 0) errors.priceStart = 'Starting price must be greater than 0.'
+      if (form.basePricePerSqft && Number(form.basePricePerSqft) <= 0) errors.basePricePerSqft = 'Base price must be greater than 0.'
+      if (form.priceEnd && Number(form.priceEnd) < Number(form.priceStart)) errors.priceEnd = 'Ending price cannot be less than starting price.'
+      if (form.parkingCharges && Number(form.parkingCharges) < 0) errors.parkingCharges = 'Parking charges cannot be negative.'
+      if (form.launchDate && form.possessionDate && form.possessionDate < form.launchDate) errors.possessionDate = 'Possession date cannot be before launch date.'
+      if (!form.residentialTypes.length) errors.residentialTypes = 'Select at least one residential configuration.'
+      if (!form.commercialTypes.length) errors.commercialTypes = 'Select at least one commercial unit type.'
+    }
+    if (index === 3) {
+      if (form.salesPhone && !/^\+?[\d\s-]{10,15}$/.test(form.salesPhone.trim())) errors.salesPhone = 'Enter a valid phone number.'
+      if (form.email && !/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.email = 'Enter a valid email address.'
+    }
+
+    setFieldErrors(errors)
+    const messages = Object.values(errors)
+    setError(messages.length ? messages[0] : '')
+    return messages.length === 0
+  }
+
+  const nextStep = () => {
+    if (!validateStep(step)) return
+    setStep((prev) => Math.min(prev + 1, MIXED_USE_STEPS.length - 1))
+  }
+
+  const prevStep = () => {
+    setError('')
+    setFieldErrors({})
+    setStep((prev) => Math.max(prev - 1, 0))
+  }
+
+  const submitForm = async () => {
+    if (!validateStep(step)) return
+    setSaving(true)
+    setError('')
+
+    try {
+      // The projects API reads flat fields and groups them into location / pricing / salesInfo / contact
+      const payload = {
+        name: form.name.trim(),
+        code: form.code.trim(),
+        developerName: form.developerName.trim(),
+        description: form.description.trim(),
+        type: 'Mixed Use',
+        status: form.status,
+        reraNo: form.reraNo.trim(),
+        launchDate: form.launchDate || undefined,
+        possessionDate: form.possessionDate || undefined,
+        totalLandArea: form.totalLandArea.trim(),
+        numberOfTowers: form.numberOfTowers,
+        numberOfFloors: form.numberOfFloors,
+        totalUnits: form.totalUnits,
+        // Residential configurations and commercial unit types share bhkTypes so listings and filters see both
+        bhkTypes: [...form.residentialTypes, ...form.commercialTypes],
+        amenities: form.amenities,
+        priceStart: form.priceStart,
+        priceEnd: form.priceEnd || undefined,
+        basePricePerSqft: form.basePricePerSqft,
+        parkingCharges: form.parkingCharges || undefined,
+        gstApplicable: !!form.gstApplicable,
+        country: form.country || 'India',
+        state: form.state.trim(),
+        city: form.city.trim(),
+        locality: form.locality.trim(),
+        address: form.address.trim(),
+        landmark: form.landmark.trim(),
+        pincode: form.pincode.trim(),
+        googleMapLink: form.googleMapLink.trim(),
+        bookingOpen: !!form.bookingOpen,
+        bankLoanAvailable: !!form.bankLoanAvailable,
+        salesOfficeAddress: form.salesOfficeAddress.trim(),
+        crmNotes: form.crmNotes.trim(),
+        salesPhone: form.salesPhone.trim(),
+        whatsapp: form.whatsapp.trim(),
+        email: form.email.trim(),
+        website: form.website.trim(),
+      }
+
+      await api.post('/projects', payload)
+      onCreated?.()
+      onClose()
+    } catch (submitError) {
+      setError(submitError?.response?.data?.message || 'Failed to create mixed use project.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const isRequired = (field) => Object.values(MIXED_USE_REQUIRED).some((fields) => field in fields)
+
+  const field = (name, label, { type = 'text', placeholder = '', span = '', options } = {}) => (
+    <div className={span}>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}{isRequired(name) && <span className="text-red-500"> *</span>}
+      </label>
+      {options ? (
+        <select value={form[name]} onChange={updateField(name)} className={`${FORM_INPUT_CLASS} text-gray-700 ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`}>
+          {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+      ) : type === 'textarea' ? (
+        <textarea rows="3" value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      ) : (
+        <input type={type} value={form[name]} onChange={updateField(name)} placeholder={placeholder} className={`${FORM_INPUT_CLASS} ${fieldErrors[name] ? 'border-red-300' : 'border-gray-200'}`} />
+      )}
+      {fieldErrors[name] && <p className="mt-1 text-xs text-red-600">{fieldErrors[name]}</p>}
+    </div>
+  )
+
+  const chipGroup = (name, label, items, activeClass, required = false) => (
+    <div>
+      <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+        {label}{required && <span className="text-red-500"> *</span>}
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <button
+            type="button"
+            key={item}
+            onClick={() => toggleListItem(name, item)}
+            className={`px-3 py-1.5 rounded-full border text-sm font-medium transition-colors ${form[name].includes(item) ? activeClass : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      {fieldErrors[name] && <p className="mt-1 text-xs text-red-600">{fieldErrors[name]}</p>}
+    </div>
+  )
+
+  const stepContent = () => {
+    if (step === 0) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('name', 'Project name', { placeholder: 'Urban Square', span: 'md:col-span-2' })}
+          {field('code', 'Project code', { placeholder: 'USQ-01' })}
+          {field('developerName', 'Developer / Builder', { placeholder: 'Urban Developers' })}
+          {field('status', 'Status', { options: PROJECT_STATUS_OPTIONS })}
+          {field('reraNo', 'RERA number', { placeholder: 'P-1234/2024' })}
+          {field('description', 'Description', { type: 'textarea', span: 'md:col-span-2', placeholder: 'Integrated township with residential towers and a high-street retail podium.' })}
+        </div>
+      )
+    }
+
+    if (step === 1) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {field('state', 'State', { placeholder: 'Maharashtra' })}
+          {field('city', 'City', { placeholder: 'Pune' })}
+          {field('locality', 'Locality', { placeholder: 'Hinjewadi' })}
+          {field('pincode', 'Pincode', { placeholder: '411057' })}
+          {field('address', 'Address', { span: 'md:col-span-2', placeholder: 'Survey No. 45, Phase 1' })}
+          {field('landmark', 'Landmark', { placeholder: 'Near Rajiv Gandhi IT Park' })}
+          {field('googleMapLink', 'Google map link', { placeholder: 'https://maps.google.com/...' })}
+        </div>
+      )
+    }
+
+    if (step === 2) {
+      return (
+        <div className="space-y-4">
+          <div className="mb-2 rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs text-primary-700">
+            This project combines residential apartments with commercial spaces such as shops and offices.
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {field('numberOfTowers', 'Total towers', { type: 'number', placeholder: '4' })}
+            {field('numberOfFloors', 'Total floors', { type: 'number', placeholder: '22' })}
+            {field('totalUnits', 'Total units', { type: 'number', placeholder: '480' })}
+            {field('totalLandArea', 'Land area', { placeholder: '8 acres' })}
+            {field('launchDate', 'Launch date', { type: 'date' })}
+            {field('possessionDate', 'Possession date', { type: 'date' })}
+            {field('priceStart', 'Starting price', { type: 'number', placeholder: '5500000' })}
+            {field('priceEnd', 'Ending price', { type: 'number', placeholder: '25000000' })}
+            {field('basePricePerSqft', 'Base price / sq.ft', { type: 'number', placeholder: '8500' })}
+            {field('parkingCharges', 'Parking charges', { type: 'number', placeholder: '300000' })}
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input type="checkbox" checked={form.gstApplicable} onChange={updateField('gstApplicable')} className="h-4 w-4 text-primary-600" />
+            GST applicable
+          </label>
+          {chipGroup('residentialTypes', 'Residential configurations', MIXED_USE_RESIDENTIAL_TYPES, 'bg-primary-600 text-white border-primary-600', true)}
+          {chipGroup('commercialTypes', 'Commercial unit types', MIXED_USE_COMMERCIAL_TYPES, 'bg-primary-600 text-white border-primary-600', true)}
+          {chipGroup('amenities', 'Amenities', MIXED_USE_AMENITIES, 'bg-green-600 text-white border-green-600')}
+        </div>
+      )
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" checked={form.bookingOpen} onChange={updateField('bookingOpen')} className="h-4 w-4 text-primary-600" />
+          Booking open
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" checked={form.bankLoanAvailable} onChange={updateField('bankLoanAvailable')} className="h-4 w-4 text-primary-600" />
+          Bank loan available
+        </label>
+        {field('salesPhone', 'Sales phone', { placeholder: '+91 98765 43210' })}
+        {field('whatsapp', 'WhatsApp', { placeholder: '+91 98765 43210' })}
+        {field('email', 'Email', { type: 'email', placeholder: 'sales@company.com' })}
+        {field('website', 'Website', { placeholder: 'https://example.com' })}
+        {field('salesOfficeAddress', 'Sales office address', { span: 'md:col-span-2', placeholder: 'Site office, Hinjewadi, Pune' })}
+        {field('crmNotes', 'CRM notes', { type: 'textarea', span: 'md:col-span-2', placeholder: 'Add notes for the sales team' })}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl border border-gray-200">
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-primary-600 font-semibold">New mixed use project</p>
+            <h2 className="text-xl font-bold text-gray-900">Add mixed use project</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-2xl leading-none text-gray-400 hover:text-gray-600">×</button>
+        </div>
+
+        <div className="px-6 py-4">
+          <div className="mb-6 flex items-center gap-3">
+            {MIXED_USE_STEPS.map((label, index) => (
+              <div key={label} className="flex items-center gap-2 flex-1 min-w-0">
+                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${index <= step ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                  {index + 1}
+                </div>
+                <span className={`hidden sm:inline text-xs font-medium ${index <= step ? 'text-gray-800' : 'text-gray-400'}`}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mb-3 text-xs text-gray-400">Fields marked <span className="text-red-500">*</span> are required.</p>
+          {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {stepContent()}
+        </div>
+
+        <div className="border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+          <button type="button" onClick={onClose} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          <div className="flex items-center gap-2">
+            {step > 0 && (
+              <button type="button" onClick={prevStep} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Back</button>
+            )}
+            {step < MIXED_USE_STEPS.length - 1 ? (
+              <button type="button" onClick={nextStep} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700">Next</button>
+            ) : (
+              <button type="button" onClick={submitForm} disabled={saving} className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60">
+                {saving ? 'Saving...' : 'Create mixed use project'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProjectTypePage() {
   const { type } = useParams()
   const [projects, setProjects] = useState([])
@@ -611,7 +1640,13 @@ export default function ProjectTypePage() {
   const projectType = TYPE_LABELS[type] || 'Projects'
   const isBuildingsPage = projectType === 'Buildings'
   const isVillasPage = projectType === 'Villas'
+  const isPlotsPage = projectType === 'Plots'
   const [isAddVillaOpen, setIsAddVillaOpen] = useState(false)
+  const [isAddPlotOpen, setIsAddPlotOpen] = useState(false)
+  const isCommercialPage = projectType === 'Commercial'
+  const [isAddCommercialOpen, setIsAddCommercialOpen] = useState(false)
+  const isMixedUsePage = projectType === 'Mixed Use'
+  const [isAddMixedUseOpen, setIsAddMixedUseOpen] = useState(false)
 
   const loadProjects = () => {
     setLoading(true)
@@ -713,6 +1748,30 @@ export default function ProjectTypePage() {
             >
               + Add Villa
             </button>
+          ) : isPlotsPage ? (
+            <button
+              type="button"
+              onClick={() => setIsAddPlotOpen(true)}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Plots
+            </button>
+          ) : isCommercialPage ? (
+            <button
+              type="button"
+              onClick={() => setIsAddCommercialOpen(true)}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Commercial
+            </button>
+          ) : isMixedUsePage ? (
+            <button
+              type="button"
+              onClick={() => setIsAddMixedUseOpen(true)}
+              className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + Add Mixed Use
+            </button>
           ) : (
             <Link to="/projects/add" className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
               + Add Building
@@ -727,6 +1786,39 @@ export default function ProjectTypePage() {
           onClose={() => setIsAddVillaOpen(false)}
           onCreated={() => {
             setIsAddVillaOpen(false)
+            loadProjects()
+          }}
+        />
+      )}
+
+      {isPlotsPage && (
+        <PlotAddModal
+          open={isAddPlotOpen}
+          onClose={() => setIsAddPlotOpen(false)}
+          onCreated={() => {
+            setIsAddPlotOpen(false)
+            loadProjects()
+          }}
+        />
+      )}
+
+      {isCommercialPage && (
+        <CommercialAddModal
+          open={isAddCommercialOpen}
+          onClose={() => setIsAddCommercialOpen(false)}
+          onCreated={() => {
+            setIsAddCommercialOpen(false)
+            loadProjects()
+          }}
+        />
+      )}
+
+      {isMixedUsePage && (
+        <MixedUseAddModal
+          open={isAddMixedUseOpen}
+          onClose={() => setIsAddMixedUseOpen(false)}
+          onCreated={() => {
+            setIsAddMixedUseOpen(false)
             loadProjects()
           }}
         />

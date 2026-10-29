@@ -15,6 +15,7 @@ const unitSchema = new mongoose.Schema(
     floor: { type: Number, required: true },
     unitNo: { type: String, required: true, trim: true },     // e.g. "101", "A-301"
     bhkType: { type: String, required: true },                // "2 BHK", "2.5 BHK", "3 BHK"
+    unitCategory: { type: String, enum: ['Residential', 'Commercial'], default: 'Residential' }, // splits mixed use inventory
     facing: { type: String },
     cornerUnit: { type: Boolean, default: false },
 
@@ -30,6 +31,16 @@ const unitSchema = new mongoose.Schema(
     parkingSpaces: { type: Number },
     villaStyle: { type: String, trim: true },
     privateGarden: { type: Boolean, default: false },
+    plotLength: { type: Number },                             // ft
+    plotWidth: { type: Number },                              // ft
+    roadWidth: { type: Number },                              // ft, road the plot faces
+    plotUsage: { type: String, trim: true },                  // Residential / Commercial / Agricultural
+    frontage: { type: Number },                               // ft, commercial shop/showroom frontage
+    ceilingHeight: { type: Number },                          // ft
+    powerLoad: { type: Number },                              // kVA sanctioned load
+    furnishingStatus: { type: String, trim: true },           // Bare shell / Warm shell / Furnished / Plug & play
+    pantry: { type: Boolean, default: false },
+    maintenancePerSqft: { type: Number },                     // INR / sqft / month (CAM)
 
     basePrice: { type: Number },                              // INR
     pricePerSqft: { type: Number },
